@@ -6,6 +6,12 @@ class TreeNode:
         self.value = value
         self.children = children
         self.condition = condition
+        
+    def is_leaf(self) -> bool:
+        return len(self.children) == 0
+    
+    def add_children(self, children=[]) -> None:
+        self.children += children
 
 def entropy(df:pd.DataFrame, attribute:str) -> float:
     values = df[attribute].unique()
@@ -31,10 +37,3 @@ def conditional_entropy(df:pd.DataFrame, attribute:str, target_attribute:str) ->
 
 def information_gain(df:pd.DataFrame, attribute:str) -> float:
     return entropy(df, 'Class') + conditional_entropy(df, 'Class', attribute)
-
-attributes = df.columns.tolist()
-attributes.remove('Class')
-print(attributes)
-
-for attribute in attributes:
-    print(attribute + ': ' + str(information_gain(df, attribute)))
