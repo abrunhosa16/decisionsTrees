@@ -1,4 +1,4 @@
-import pandas as pd, numpy as np, sklearn, matplotlib as plt
+import pandas as pd, numpy as np, matplotlib as plt
 from restaurant import df
 
 class TreeNode:
@@ -37,3 +37,5 @@ def conditional_entropy(df:pd.DataFrame, attribute:str, target_attribute:str) ->
 
 def information_gain(df:pd.DataFrame, attribute:str) -> float:
     return entropy(df, 'Class') + conditional_entropy(df, 'Class', attribute)
+
+print(information_gain(df, 'Est'))
