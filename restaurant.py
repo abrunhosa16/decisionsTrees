@@ -15,3 +15,7 @@ df = df.replace(pat_dict)
 df = df.replace(price_dict)
 df = df.replace(type_dict)
 df = df.replace(est_dict)
+
+from decisionTree import *
+
+print(entropy(df, binary)) 

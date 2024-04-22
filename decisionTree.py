@@ -13,14 +13,15 @@ class TreeNode:
     def add_children(self, children=[]) -> None:
         self.children += children
 
-def entropy(df:pd.DataFrame, attribute:str) -> float:
-    values = df[attribute].unique()
-    entropy = 0
+def entropy(df: pd.DataFrame, attribute: str) -> float:
+    if len(df) == 0 or len(df[attribute].unique()) == 1:
+        return 0 
 
-    for value in values:
-        subset_df = df[df[attribute] == value]
-        prob = len(subset_df) / len(df)
-        entropy -= prob * np.log2(prob)
+    # Implementação vetorizada para aumentar eficiencia 
+    # normalize = true faz a proporção dos valores 
+    value_counts = df[attribute].value_counts(normalize=True)
+    entropy = -(value_counts * np.log2(value_counts)).sum()
+
     return entropy
 
 def conditional_entropy(df:pd.DataFrame, attribute:str, target_attribute:str) -> float: #H( attribute | target_attribute )
@@ -35,8 +36,9 @@ def conditional_entropy(df:pd.DataFrame, attribute:str, target_attribute:str) ->
         entropy_attribute += prob_cls * entropy_subset
     return entropy_attribute
 
-def information_gain(df:pd.DataFrame, attribute:str) -> float: 
-    return entropy(df, 'Class') + conditional_entropy(df, 'Class', attribute)
+def information_gain(df:pd.DataFrame, attribute:str, target_atribute= 'Class') -> float:
+    # conditional_entropy não está invertida as variaveis?
+    return entropy(df, target_atribute) + conditional_entropy(df, target_atribute, attribute)
 
 def max_gain(df:pd.DataFrame) -> str: #return no atributo com ganho de informçao maximo
     attributes = df.columns.to_list()
