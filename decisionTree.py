@@ -35,7 +35,41 @@ def conditional_entropy(df:pd.DataFrame, attribute:str, target_attribute:str) ->
         entropy_attribute += prob_cls * entropy_subset
     return entropy_attribute
 
-def information_gain(df:pd.DataFrame, attribute:str) -> float:
+def information_gain(df:pd.DataFrame, attribute:str) -> float: 
     return entropy(df, 'Class') + conditional_entropy(df, 'Class', attribute)
 
-print(information_gain(df, 'Est'))
+def max_gain(df:pd.DataFrame) -> str: #return no atributo com ganho de informçao maximo
+    attributes = df.columns.to_list()
+    attributes.remove('Class')
+    max = (None, float('-inf'))
+    for attribute in attributes:
+        information_gain = information_gain(df, attribute)
+        if information_gain > max[1]:
+            max = (attribute, information_gain)
+    return max[0]
+
+def plurality_value(df:pd.DataFrame) -> int: #return no valor mais frequente da classe alvo, contando que esse é inteiro
+    values = df['Class'].value_counts().to_dict()
+    max_value = (None, float('-inf'))
+    for key, value in values.items():
+        if value > max_value[1]:
+            max_value = (key, value)
+    return max_value[0]
+
+def decisionTree(df:pd.DataFrame, attributes:list, parent_df=None) -> TreeNode:
+    if df.shape[0] == 0: #sem exemplos
+        return plurality_value(df)
+    elif max(list(df['Class'].value_counts())) == df.shape[0]: #samples todos com a mesma classificação
+        return df['Class'][0]
+    elif len(attributes) == 0: #sem atributos restantes
+        return plurality_value(parent_df)
+    else:
+        attribute = max_gain(df)
+        #adicionar o atributo como raiz de uma arvore
+        for value in set(df[attribute].values):
+            sub_df = df[df[attribute] == value]
+            attributes = attributes.remove(attribute)
+            subtree = decisionTree(sub_df, attributes, df)
+            #adicionar um ramo com attribute = value e subtree = subtree
+        return 
+   
