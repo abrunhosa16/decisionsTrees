@@ -1,0 +1,15 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.0
+bert-score==0.3.13
+tiktoken==0.5.2
+transformers==4.37.2
+scipy==1.12.0
+numpy==1.26.0
+pandas==2.1.4
+pyyaml==6.0.1
+astropy==6.0.0
+matplotlib==3.8.2
+scikit-image==0.22.0
+jupyter
+ipython
+-e .
