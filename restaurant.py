@@ -4,6 +4,8 @@ df = pd.read_csv('datasets/restaurant.csv')
 
 df = df.drop('ID', axis=1)
 
+df[df['Pat'].isna()] = 'None'
+
 binary_attributes = ['Alt', 'Bar', 'Fri',' Hun', 'Rain', 'Class']
 binary = {'Yes':1, 'No':0}
 pat_dict = {'None':0, 'Some':1, 'Full':2}
