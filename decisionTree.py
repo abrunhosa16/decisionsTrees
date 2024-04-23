@@ -33,13 +33,14 @@ class TreeNode:
             child.print_tree(level + 1)
 
 def entropy(df: pd.DataFrame, attribute: str) -> float:
-    values = df[attribute].unique()
-    entropy = 0
+    if len(df) == 0 or len(df[attribute].unique()) == 1:
+        return 0 
 
-    for value in values:
-        subset_df = df[df[attribute] == value]
-        prob = len(subset_df) / len(df)
-        entropy -= prob * np.log2(prob + 1e-10)  # Adding small value to avoid log(0)
+    # Implementação vetorizada para aumentar eficiencia 
+    # normalize = true faz a proporção dos valores 
+    value_counts = df[attribute].value_counts(normalize=True)
+    entropy = -(value_counts * np.log2(value_counts)).sum()
+
     return entropy
 
 def conditional_entropy(df: pd.DataFrame, attribute: str, target_attribute: str) -> float:
