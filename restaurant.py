@@ -1,5 +1,7 @@
 import pandas as pd, numpy as np, matplotlib as plt
 
+pd.set_option('future.no_silent_downcasting', True)
+
 df = pd.read_csv('datasets/restaurant.csv')
 
 df = df.drop('ID', axis=1)

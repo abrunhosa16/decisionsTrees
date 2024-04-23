@@ -91,14 +91,12 @@ def decisionTree(df: pd.DataFrame, attributes: list, parent_df=None) -> TreeNode
     attributes.remove(attribute) #remover atributo com max info gain para a recursão
     
     possible_values = set(df[attribute].values) #todos os possiveis valores do atributo com max info gain
-
+    
     for value in possible_values:
         sub_df = df[df[attribute] == value] #exemplos do atributo com v=value
         subtree = decisionTree(df= sub_df, attributes= attributes.copy(), parent_df= df)
         subtree.prev_value = value
         tree.add_child(subtree)
-    if tree.attribute == None:
-        print(attribute)
     return tree
 
 # Example usage:

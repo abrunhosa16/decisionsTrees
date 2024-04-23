@@ -23,3 +23,9 @@ y_pred = clf.predict(X_test)
 
 # Model Accuracy, how often is the classifier correct?
 print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
+
+from sklearn.tree import export_text
+
+# Print the decision tree
+tree_rules = export_text(clf, feature_names=feature_cols)
+print(tree_rules)
