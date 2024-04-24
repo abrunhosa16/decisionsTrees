@@ -113,19 +113,16 @@ attributes.remove('Class')
 decisiontree = decisionTree(original_df=df , df=df, attributes=attributes)
 decisiontree.print_tree()
 
-# attributes = df.columns.to_list()
-# attributes.remove('Class')
-# print(attributes)
-# test = [1,0,0,1,2,1,0,0,1,2,0]
-# cur = decisiontree.copy()
-# while len(cur.children) > 0:
-#     cur_attribute = cur.attribute
-#     idx = attributes.index(cur_attribute)
-#     for child in cur.children:
-#         print(cur_attribute)
-#         print(test[idx])
-#         if child.prev_value == test[idx]:
-#             cur = child
-#             break
-# print(cur)
-    
+def test_restaurant_decision_tree(df: pd.DataFrame, tree: TreeNode, sample: list): #sample = [1,0,0,1,1,2,0,1,0,0,1]
+    attributes = df.columns.to_list()
+    attributes.remove('Class')
+    cur = tree.copy()
+    while len(cur.children) > 0:
+        idx = attributes.index(cur.attribute)
+        for child in cur.children:
+            if child.prev_value == sample[idx]:
+                cur = child
+                break  
+    return cur
+
+print(test_restaurant_decision_tree(df, decisiontree, [1,0,0,1,1,2,0,1,0,0,1]))
