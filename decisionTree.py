@@ -49,6 +49,7 @@ def conditional_entropy(df: pd.DataFrame, attribute: str, target_attribute: str)
     total_examples = len(df)
 
     for cls in target_classes:
+        #subset_df = df.query(f'{target_attribute} == {cls}')
         subset_df = df[df[target_attribute] == cls]
         entropy_subset = entropy(subset_df, attribute)
         prob_cls = len(subset_df) / total_examples #probabilidade desta classe acontecer P(cls)
