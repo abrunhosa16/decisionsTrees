@@ -100,19 +100,10 @@ def decisionTree(original_df: pd.DataFrame, df: pd.DataFrame, attributes: list, 
         tree.add_child(subtree)
     return tree
 
-# Example usage:
-# Assuming you have a DataFrame 'df' with columns including 'Class' and other attributes
-# attributes = list(df.columns)
-# attributes.remove('Class')
-# root_node = decisionTree(df, attributes)
-
-# You can then traverse the tree to make predictions or visualize it as needed.
-
-
 attributes = df.columns.to_list()
 attributes.remove('Class')
 decisiontree = decisionTree(original_df=df , df=df, attributes=attributes)
-decisiontree.print_tree()
+# decisiontree.print_tree()
 
 def test_restaurant_decision_tree(df: pd.DataFrame, tree: TreeNode, sample: list): #sample = [1,0,0,1,1,2,0,1,0,0,1]
     attributes = df.columns.to_list()
@@ -124,6 +115,18 @@ def test_restaurant_decision_tree(df: pd.DataFrame, tree: TreeNode, sample: list
             if child.prev_value == sample[idx]:
                 cur = child
                 break  
-    return cur
+    return cur.classification
 
-print(test_restaurant_decision_tree(df, decisiontree, [1,0,0,1,1,2,0,1,0,0,1]))
+# print(test_restaurant_decision_tree(df, decisiontree, [1,0,0,1,1,2,0,1,0,0,1]))
+
+def test_accuracy(df: pd.DataFrame, tree: TreeNode):
+    n = 0
+    for i in range(df.shape[0]):
+        row = df.iloc[i].to_list()
+        expected_result = row[-1]
+        result = test_restaurant_decision_tree(df, tree, row)
+        if result == expected_result: n += 1
+    return n/df.shape[0] * 100
+
+print(test_accuracy(df, decisiontree))
+

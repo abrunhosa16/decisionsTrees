@@ -1,6 +1,5 @@
 import pandas as pd, numpy as np, matplotlib as plt
 
-pd.set_option('future.no_silent_downcasting', True)
 
 df = pd.read_csv('datasets/restaurant.csv')
 
@@ -19,5 +18,3 @@ df['Price'] = df['Price'].map(price_dict)
 df['Type'] = df['Type'].map(type_dict)
 df['Est'] = df['Est'].map(est_dict)
 df = df.replace(binary)
-
-print(df)
