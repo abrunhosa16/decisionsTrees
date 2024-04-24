@@ -2,13 +2,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from copy import deepcopy
-from restaurant import df
+from datasets.restaurant import df
 
 class TreeNode:
-    def __init__(self, attribute=None, prev_value=None, classification=None, children=None) -> None: #prev_value para o valor que o o ramo verifica quanto ao no anterior atributo
-        self.attribute = attribute
-        self.prev_value = prev_value
-        self.classification = classification
+    def __init__(self, attribute=None, prev_value=None, classification=None, children=None) -> None:
+        self.attribute = attribute #atributo a ser avaliado no nó SE NÃO FOR FOLHA
+        self.prev_value = prev_value #valor do atributo do nó pai, como se fosse o valor do ramo SE NÃO FOR A RAIZ
+        self.classification = classification #classificação da classe final SE FOR FOLHA
         self.children = children if children is not None else []
 
     def copy(self):
@@ -26,9 +26,9 @@ class TreeNode:
     def add_children(self, children=[]) -> None:
         self.children += children
         
-    def print_tree(self, level=0):
+    def print_tree(self, level=0) -> None:
         prefix = "|   " * level
-        print(f"{prefix}|-- {self.attribute}: {self.prev_value if self.prev_value is not None else ''} - {self.classification}")
+        print(f"{prefix}|-- {self.attribute} |Valor do ramo:{self.prev_value if self.prev_value is not None else '##'}|  |Classe:{self.classification if self.classification is not None else '##'}|")
         for child in self.children:
             child.print_tree(level + 1)
 
@@ -43,7 +43,7 @@ def entropy(df: pd.DataFrame, attribute: str) -> float:
 
     return entropy
 
-def conditional_entropy(df: pd.DataFrame, attribute: str, target_attribute: str) -> float:
+def conditional_entropy(df: pd.DataFrame, attribute: str, target_attribute: str) -> float: #H(attribute | target_attribute)
     target_classes = df[target_attribute].unique()
     entropy_attribute = 0
     total_examples = len(df)
@@ -55,10 +55,10 @@ def conditional_entropy(df: pd.DataFrame, attribute: str, target_attribute: str)
         entropy_attribute += prob_cls * entropy_subset
     return entropy_attribute
 
-def information_gain(df: pd.DataFrame, attribute: str) -> float:
+def information_gain(df: pd.DataFrame, attribute: str) -> float: #return no ganho de informação
     return entropy(df, 'Class') - conditional_entropy(df, attribute, 'Class')
 
-def max_gain(df: pd.DataFrame, attributes: list) -> str:
+def max_gain(df: pd.DataFrame, attributes: list) -> str: #para saber qual o atributo dos attirubtes passados com o maior ganho de informação 
     max_info_gain = (None, float('-inf'))
     for attribute in attributes:
         gain = information_gain(df, attribute)
@@ -66,7 +66,7 @@ def max_gain(df: pd.DataFrame, attributes: list) -> str:
             max_info_gain = (attribute, gain)
     return max_info_gain[0]
 
-def plurality_value(df: pd.DataFrame) -> int:
+def plurality_value(df: pd.DataFrame) -> int: #obtem a classe mais frequente no df
     values = df['Class'].value_counts().to_dict()
     max_value = (None, float('-inf'))
     for key, value in values.items():
@@ -74,7 +74,7 @@ def plurality_value(df: pd.DataFrame) -> int:
             max_value = (key, value)
     return max_value[0]
 
-def decisionTree(df: pd.DataFrame, attributes: list, parent_df=None) -> TreeNode:
+def decisionTree(original_df: pd.DataFrame, df: pd.DataFrame, attributes: list, parent_df=None) -> TreeNode:
     
     if df.empty: #sem exemplos
         return TreeNode(classification= plurality_value(parent_df))
@@ -90,11 +90,11 @@ def decisionTree(df: pd.DataFrame, attributes: list, parent_df=None) -> TreeNode
     
     attributes.remove(attribute) #remover atributo com max info gain para a recursão
     
-    possible_values = set(df[attribute].values) #todos os possiveis valores do atributo com max info gain
+    possible_values = set(original_df[attribute].values) #todos os possiveis valores do atributo com max info gain
     
     for value in possible_values:
         sub_df = df[df[attribute] == value] #exemplos do atributo com v=value
-        subtree = decisionTree(df= sub_df, attributes= attributes.copy(), parent_df= df)
+        subtree = decisionTree(original_df= original_df, df= sub_df, attributes= attributes.copy(), parent_df= df)
         subtree.prev_value = value
         tree.add_child(subtree)
     return tree
@@ -110,7 +110,7 @@ def decisionTree(df: pd.DataFrame, attributes: list, parent_df=None) -> TreeNode
 
 attributes = df.columns.to_list()
 attributes.remove('Class')
-decisiontree = decisionTree(df, attributes)
+decisiontree = decisionTree(original_df=df , df=df, attributes=attributes)
 decisiontree.print_tree()
 
 # attributes = df.columns.to_list()
@@ -129,6 +129,3 @@ decisiontree.print_tree()
 #             break
 # print(cur)
     
-'''
-    Preciso pensar numa lógica para a arvore de decisão
-'''
