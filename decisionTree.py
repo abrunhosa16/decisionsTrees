@@ -1,132 +1,139 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from copy import deepcopy
 from datasets.restaurant import df
 
-class TreeNode:
-    def __init__(self, attribute=None, prev_value=None, classification=None, children=None) -> None:
-        self.attribute = attribute #atributo a ser avaliado no nó SE NÃO FOR FOLHA
-        self.prev_value = prev_value #valor do atributo do nó pai, como se fosse o valor do ramo SE NÃO FOR A RAIZ
-        self.classification = classification #classificação da classe final SE FOR FOLHA
-        self.children = children if children is not None else []
+'''
+    MUDAR A FUNÇAO DE GANHO DE INFORMAÇÃO E VERIFICAR TODAS ESSAS
+'''
 
-    def copy(self):
-        return deepcopy(self)
-
-    def __str__(self) -> str:
-        return str(self.attribute) + ' / ' + str(self.prev_value) + ' / ' + str(self.classification)
+class Node:
+    def __init__(self, feature: int= None, condition= None, children: list= [], info_gain: float= None, leaf_value= None) -> None:
+        #for decision nodes
+        self.feature = feature
+        self.children = children
+        self.info_gain = info_gain
         
+        #for leaf nodes
+        self.leaf_value = leaf_value
+        
+        #for all nodes except root
+        self.condition = condition
+    
     def add_child(self, child) -> None:
         self.children.append(child)
-
-    def is_leaf(self) -> bool:
-        return len(self.children) == 0
-    
-    def add_children(self, children=[]) -> None:
-        self.children += children
         
-    def print_tree(self, level=0) -> None:
-        prefix = "|   " * level
-        print(f"{prefix}|-- {self.attribute} |Valor do ramo:{self.prev_value if self.prev_value is not None else '##'}|  |Classe:{self.classification if self.classification is not None else '##'}|")
-        for child in self.children:
-            child.print_tree(level + 1)
-
-def entropy(df: pd.DataFrame, attribute: str) -> float:
-    if len(df) == 0 or len(df[attribute].unique()) == 1:
-        return 0 
-
-    # Implementação vetorizada para aumentar eficiencia 
-    # normalize = true faz a proporção dos valores 
-    value_counts = df[attribute].value_counts(normalize=True)
-    entropy = -(value_counts * np.log2(value_counts)).sum()
-
-    return entropy
-
-def conditional_entropy(df: pd.DataFrame, attribute: str, target_attribute: str) -> float: #H(attribute | target_attribute)
-    target_classes = df[target_attribute].unique()
-    entropy_attribute = 0
-    total_examples = len(df)
-
-    for cls in target_classes:
-        #subset_df = df.query(f'{target_attribute} == {cls}')
-        subset_df = df[df[target_attribute] == cls]
-        entropy_subset = entropy(subset_df, attribute)
-        prob_cls = len(subset_df) / total_examples #probabilidade desta classe acontecer P(cls)
-        entropy_attribute += prob_cls * entropy_subset
-    return entropy_attribute
-
-def information_gain(df: pd.DataFrame, attribute: str) -> float: #return no ganho de informação
-    return entropy(df, 'Class') - conditional_entropy(df, attribute, 'Class')
-
-def max_gain(df: pd.DataFrame, attributes: list) -> str: #para saber qual o atributo dos attirubtes passados com o maior ganho de informação 
-    max_info_gain = (None, float('-inf'))
-    for attribute in attributes:
-        gain = information_gain(df, attribute)
-        if gain > max_info_gain[1]:
-            max_info_gain = (attribute, gain)
-    return max_info_gain[0]
-
-def plurality_value(df: pd.DataFrame) -> int: #obtem a classe mais frequente no df
-    values = df['Class'].value_counts().to_dict()
-    max_value = (None, float('-inf'))
-    for key, value in values.items():
-        if value > max_value[1]:
-            max_value = (key, value)
-    return max_value[0]
-
-def decisionTree(original_df: pd.DataFrame, df: pd.DataFrame, attributes: list, parent_df=None) -> TreeNode:
+    def set_condition(self, condition) -> None:
+        self.condition = condition
+        
+    def __str__(self) -> str:
+        string = self.feature + str(len(self.children))
+        return string
+        
+class DecisionTreeClassifier:
+    def __init__(self, min_samples_split= 2, max_depth= 2) -> None:
+        self.root = None
+        
+        #stoppping conditions
+        self.min_samples_split = min_samples_split #minimo de samples para continuar a criar nós de decisão, se o numero de samples for menor cria-se um leaf_node
+        self.max_depth = max_depth
+        
+    def build_tree(self, dataset: pd.DataFrame, curr_depth= 0):
+        y = dataset['Class']
+        x = dataset[dataset.columns.to_list()[:-1]]
+        
+        num_samples, num_features = x.shape
+        
+        if num_samples >= self.min_samples_split and curr_depth <= self.max_depth:
+            best_split = self.get_best_split(dataset, num_samples, num_features) #dict com feature, info_gain, datasets filhos
+            if best_split['info_gain'] > 0:
+                    #logica de recursão usando os best_split 
+                    parent_node = Node(feature= best_split['feature_index'], info_gain= best_split['info_gain'])
+                    for value, child_dataset in best_split['datasets'].items():
+                        subtree = self.build_tree(dataset= child_dataset, curr_depth= curr_depth+1)
+                        subtree.set_condition(value)
+                        parent_node.add_child(subtree)
+                        
+                    return parent_node
+        
+        leaf_value = self.calculate_leaf_value(y)
+        return Node(leaf_value= leaf_value)     
     
-    if df.empty: #sem exemplos
-        return TreeNode(classification= plurality_value(parent_df))
+    def entropy(self, dataset):
+        # Calculate entropy for a dataset
+        if dataset.empty or len(dataset.unique()) == 1:
+            return 0
+        value_counts = dataset.value_counts(normalize=True)
+        entropy = -(value_counts * np.log2(value_counts)).sum()
+        return entropy
 
-    if len(df['Class'].unique()) == 1: #todos os exemplos têm a mesma classe
-        return TreeNode(classification= df['Class'].iloc[0])
+    def conditional_entropy(self, dataset, attribute, target_attribute):
+        target_classes = dataset[target_attribute].unique()
+        entropy_attribute = 0
+        total_examples = len(dataset)
+        for cls in target_classes:
+            subset_df = dataset[dataset[target_attribute] == cls]
+            entropy_subset = self.entropy(subset_df[attribute])
+            prob_cls = len(subset_df) / total_examples
+            entropy_attribute += prob_cls * entropy_subset
+        return entropy_attribute
 
-    if len(attributes) == 0: #sem atributos
-        return TreeNode(classification= plurality_value(df))
+    def information_gain(self, dataset, attribute, target_attribute):
+        return self.entropy(dataset[target_attribute]) - self.conditional_entropy(dataset, attribute, target_attribute)
 
-    attribute = max_gain(df, attributes) #atributo mais importante
-    tree = TreeNode(attribute= attribute) #decisionTree
+    def max_info_gain(self, dataset, target_attribute):
+        print(dataset)
+        max_info_gain = (None, float('-inf'))
+        for feature in dataset.columns:
+            if feature != target_attribute:
+                info_gain = self.information_gain(dataset, feature, target_attribute)
+                if info_gain > max_info_gain[1]:
+                    max_info_gain = (feature, info_gain)
+        return max_info_gain
+ 
+    def get_best_split(self, dataset: pd.DataFrame, num_samples, num_features) -> dict: #obtem os datasets filhos
+        feature, info_gain = self.max_info_gain(dataset, 'Class')
+        feature_values = dataset[feature].unique()
+        child_datasets = {}
+        for value in feature_values: #separa em datasets filhos para cada valor da feature
+            child_dataset = dataset[dataset[feature] == value]
+            child_datasets[value] = child_dataset
+            
+        best_split = {}    
+        best_split['feature_index'] = feature
+        best_split['info_gain'] = info_gain
+        best_split['datasets'] = child_datasets
+        return best_split
+        
+    def calculate_leaf_value(self, y):
+        y = list(y)
+        return max(y, key= y.count)
     
-    attributes.remove(attribute) #remover atributo com max info gain para a recursão
+    def fit(self, x: pd.DataFrame, y: pd.DataFrame):
+        dataset = pd.concat((x,y), axis=1)
+        self.root = self.build_tree(dataset)
+        self.features = x.columns.to_list()
+        
+    def predict(self, X):
+        predictions = [self.make_prediction(x, self.root) for x in X]
+        return predictions
     
-    possible_values = set(original_df[attribute].values) #todos os possiveis valores do atributo com max info gain
-    
-    for value in possible_values:
-        sub_df = df[df[attribute] == value] #exemplos do atributo com v=value
-        subtree = decisionTree(original_df= original_df, df= sub_df, attributes= attributes.copy(), parent_df= df)
-        subtree.prev_value = value
-        tree.add_child(subtree)
-    return tree
+    def make_prediction(self, x, tree: Node):
+        if tree.leaf_value != None: 
+            return tree.leaf_value
+        feature_value = x[tree.feature]
+        for child in tree.children:
+            if feature_value == child.condition:
+                return self.make_prediction(x, child)
+        print('ERROR')
+        
 
-attributes = df.columns.to_list()
-attributes.remove('Class')
-decisiontree = decisionTree(original_df=df , df=df, attributes=attributes)
-# decisiontree.print_tree()
+        
+        
+x = df.iloc[:, :-1]
+y = df.iloc[:, -1]
+from sklearn.model_selection import train_test_split
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size= 0.2, random_state= 41)
 
-def test_restaurant_decision_tree(df: pd.DataFrame, tree: TreeNode, sample: list): #sample = [1,0,0,1,1,2,0,1,0,0,1]
-    attributes = df.columns.to_list()
-    attributes.remove('Class')
-    cur = tree.copy()
-    while len(cur.children) > 0:
-        idx = attributes.index(cur.attribute)
-        for child in cur.children:
-            if child.prev_value == sample[idx]:
-                cur = child
-                break  
-    return cur.classification
-
-# print(test_restaurant_decision_tree(df, decisiontree, [1,0,0,1,1,2,0,1,0,0,1]))
-
-def test_accuracy(df: pd.DataFrame, tree: TreeNode):
-    n = 0
-    for i in range(df.shape[0]):
-        row = df.iloc[i].to_list()
-        expected_result = row[-1]
-        result = test_restaurant_decision_tree(df, tree, row)
-        if result == expected_result: n += 1
-    return n/df.shape[0] * 100
-
-print(test_accuracy(df, decisiontree))
-
+classifier = DecisionTreeClassifier(min_samples_split= 1, max_depth= 4)
+classifier.fit(x, y)
+print(classifier.root)
