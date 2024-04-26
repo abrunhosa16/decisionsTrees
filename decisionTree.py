@@ -18,7 +18,7 @@ class Node:
     def add_child(self, child) -> None:
         self.children.append(child)
         
-    def set_condition(self, condition) -> None:
+    def set_condition(self, condition: int) -> None:
         self.condition = condition
         
     def __str__(self) -> str:
@@ -31,7 +31,7 @@ class DecisionTreeClassifier:
         
         #stoppping conditions
         self.min_samples_split = min_samples_split #minimo de samples para continuar a criar nós de decisão, se o numero de samples for menor cria-se um leaf_node
-        self.max_depth = max_depth
+        self.max_depth = max_depth #maximo de profundidade da arvore
         
     def build_tree(self, dataset: pd.DataFrame, cur_depth: int = 0) -> Node:
         x = dataset[dataset.columns.to_list()[:-1]] 
@@ -48,13 +48,13 @@ class DecisionTreeClassifier:
                         subtree = self.build_tree(dataset= child_dataset, cur_depth= cur_depth+1)
                         subtree.set_condition(value)
                         children.append(subtree)
-                    return Node(feature= best_split['feature_index'], info_gain= best_split['info_gain'], children= children)
+                    return Node(feature= best_split['feature'], info_gain= best_split['info_gain'], children= children)
         
         leaf_value = self.calculate_leaf_value(y)
         return Node(leaf_value= leaf_value)     
     
     def b(self, q: float) -> float:
-        if q == 0 or q == 1:
+        if q in {0, 1}:
             return 0
         return -(q*np.log2(q) + (1-q)*np.log2(1-q))
     
@@ -68,26 +68,17 @@ class DecisionTreeClassifier:
         return entropy
 
     def remainder(self, dataset: pd.DataFrame, feature: str) -> float:
+        class_counts = dataset['Class'].value_counts()
+        p = class_counts.get(1, 0)  
+        n = class_counts.get(0, 0) 
+        
         r = 0
-        possible_values = dataset[feature].unique()
-        dic = dataset['Class'].value_counts().to_dict()
-        p, n= 0, 0
-        for key, item in dic.items():
-                if key == 1:
-                    p = item
-                if key == 0:
-                    n = item
-        for value in possible_values:
+        for value in dataset[feature].unique():
             k_dataset = dataset[dataset[feature] == value]
-            dic = k_dataset['Class'].value_counts().to_dict()
-            pk, nk = 0, 0
+            k_class_counts = k_dataset['Class'].value_counts()
+            pk = k_class_counts.get(1, 0)  
+            nk = k_class_counts.get(0, 0) 
             
-            for key, item in dic.items():
-                if key == 1:
-                    pk = item
-                if key == 0:
-                    nk = item
-                    
             r += (pk + nk) / (p + n) * self.b(pk / (pk + nk))
         return r
 
@@ -109,7 +100,7 @@ class DecisionTreeClassifier:
             child_datasets[value] = child_dataset
             
         best_split = {}    
-        best_split['feature_index'] = feature
+        best_split['feature'] = feature
         best_split['info_gain'] = info_gain
         best_split['datasets'] = child_datasets
         return best_split
@@ -120,8 +111,8 @@ class DecisionTreeClassifier:
     
     def fit(self, x: pd.DataFrame, y: pd.DataFrame) -> None:
         dataset = pd.concat((x,y), axis=1)
-        self.root = self.build_tree(dataset)
-        self.features = x.columns.to_list()
+        self.root = self.build_tree(dataset= dataset)
+        self.features = x.columns.to_list() #???
         
     def predict(self, X: pd.DataFrame):
         predictions = [self.make_prediction(row, self.root) for _, row in X.iterrows()]
@@ -134,7 +125,7 @@ class DecisionTreeClassifier:
         for child in tree.children:
             if feature_value == child.condition:
                 return self.make_prediction(x, child)
-        print('ERROR')
+        print('NO PREDICTION')
         
     def print_tree(self, node: Node, indent=""):
         if node is None:
@@ -145,9 +136,7 @@ class DecisionTreeClassifier:
         print(indent + "Feature:" + node.feature + "|   Condition: " + str(node.condition))
         for child in node.children:
             self.print_tree(child, indent + "   ")
-        
-
-        
+           
 from sklearn.model_selection import train_test_split
 train_df, test_df = train_test_split(df, test_size=0.2, random_state=42)
 x_train = train_df.iloc[:, :-1]
@@ -160,5 +149,4 @@ classifier = DecisionTreeClassifier(min_samples_split= 4, max_depth= 6)
 classifier.fit(x_train, y_train)
 classifier.print_tree(classifier.root)
 
-print(y_train)
 print(classifier.predict(x_train))
