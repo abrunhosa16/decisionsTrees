@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 from datasets.restaurant import df
+from datasets.weather import weather1
+
+import math
 
 class Node:
     def __init__(self, feature: int= None, condition= None, children: list= [], info_gain: float= None, leaf_value= None) -> None:
@@ -32,10 +35,14 @@ class DecisionTreeClassifier:
         #stoppping conditions
         self.min_samples_split = min_samples_split #minimo de samples para continuar a criar nós de decisão, se o numero de samples for menor cria-se um leaf_node
         self.max_depth = max_depth
+    
+    def featuresTarget(self, dataset: pd.DataFrame):
+        return dataset.columns[:-1], dataset.columns[-1]
         
     def build_tree(self, dataset: pd.DataFrame, cur_depth: int = 0) -> Node:
-        x = dataset[dataset.columns.to_list()[:-1]] 
-        y = dataset['Class']
+        features, target = self.featuresTarget(dataset)
+        x = dataset[features] 
+        y = dataset[target]
         
         num_samples, _= x.shape
         
@@ -56,7 +63,9 @@ class DecisionTreeClassifier:
     def b(self, q: float) -> float:
         if q == 0 or q == 1:
             return 0
-        return -(q*np.log2(q) + (1-q)*np.log2(1-q))
+        a = -(q*np.log2(q) + (1-q)*np.log2(1-q))
+        return a
+    
     
     def entropy(self, dataset: pd.DataFrame, feature: str) -> float:
         column = dataset[feature]
@@ -70,7 +79,8 @@ class DecisionTreeClassifier:
     def remainder(self, dataset: pd.DataFrame, feature: str) -> float:
         r = 0
         possible_values = dataset[feature].unique()
-        dic = dataset['Class'].value_counts().to_dict()
+        target = self.featuresTarget(dataset)[1]
+        dic = dataset[target].value_counts().to_dict()
         p, n= 0, 0
         for key, item in dic.items():
                 if key == 1:
@@ -79,7 +89,7 @@ class DecisionTreeClassifier:
                     n = item
         for value in possible_values:
             k_dataset = dataset[dataset[feature] == value]
-            dic = k_dataset['Class'].value_counts().to_dict()
+            dic = k_dataset[target].value_counts().to_dict()
             pk, nk = 0, 0
             
             for key, item in dic.items():
@@ -87,7 +97,6 @@ class DecisionTreeClassifier:
                     pk = item
                 if key == 0:
                     nk = item
-                    
             r += (pk + nk) / (p + n) * self.b(pk / (pk + nk))
         return r
 
@@ -145,20 +154,67 @@ class DecisionTreeClassifier:
         print(indent + "Feature:" + node.feature + "|   Condition: " + str(node.condition))
         for child in node.children:
             self.print_tree(child, indent + "   ")
+
+
+def subsets(df, target):
+        yes = df[df[target] == 1]
+        no = df[df[target] == 0]
+        return yes, no
+
+def split_representative(df, target: str, perc: float) -> float:
+        yes_per, _ = df[target].value_counts(normalize=True) # proporção de sims e naos
+        yes_sub, no_sub = subsets(df, target)[0].index.values.tolist(),  subsets(df, target)[1].index.values.tolist()# o subconjunto de sins e naos representados pelo ID
+        # Embaralhar os indices de sins e naos
+        total_yes, total_no = np.random.choice(yes_sub, size=len(yes_sub), replace=False), np.random.choice(no_sub, size=len(no_sub), replace=False)
+        num_train = math.ceil(perc * df.shape[0])
+        num_yes = math.ceil(num_train * yes_per) # calcula o valor a ser removido para teste 
+        num_no = num_train - num_yes # calcula o valor a ser removido para teste 
+        test = df.iloc[[*total_yes[:num_yes],*total_no[:num_no]]] # indices para teste
+        train = df.iloc[[*total_yes[num_yes:], *total_no[num_no:]]] # indices para treino 
+
+        return train, test
         
+# train_df, test_df = split_representative(df, 'Class', 0.3)
+# x_train = train_df.iloc[:, :-1]
+# y_train = train_df.iloc[:, -1]
 
-        
-from sklearn.model_selection import train_test_split
-train_df, test_df = train_test_split(df, test_size=0.2, random_state=42)
-x_train = train_df.iloc[:, :-1]
-y_train = train_df.iloc[:, -1]
+# x_test = test_df.iloc[:, :-1]
+# y_test = test_df.iloc[:, -1]
 
-x_test = test_df.iloc[:, :-1]
-y_test = test_df.iloc[:, -1]
+# classifier = DecisionTreeClassifier(min_samples_split= 7, max_depth= 30)
+# classifier.fit(x_train, y_train)
+# classifier.print_tree(classifier.root)
 
-classifier = DecisionTreeClassifier(min_samples_split= 4, max_depth= 6)
-classifier.fit(x_train, y_train)
-classifier.print_tree(classifier.root)
+# print(y_test)
 
-print(y_train)
-print(classifier.predict(x_train))
+
+# from sklearn.metrics import precision_score
+
+# # Suponha que você tenha os seguintes rótulos verdadeiros e previstos pelo modelo:
+# y_pred = classifier.predict(x_test)
+# print(y_pred)
+# # Para calcular a precisão, basta chamar a função "precision_score" passando os rótulos verdadeiros e previstos como argumentos:
+# precision = precision_score(y_test, y_pred)
+
+# A precisão será um valor entre 0 e 1:
+# print(precision) 
+
+def precision(dataframe, target):
+    positivos = 0
+    total = 0
+    for _ in range(20):
+        train_df, test_df = split_representative(dataframe, target, 0.3)
+        x_train = train_df.iloc[:, :-1]
+        y_train = train_df.iloc[:, -1]
+
+        x_test = test_df.iloc[:, :-1]
+        y_test = test_df.iloc[:, -1].tolist()
+        classifier = DecisionTreeClassifier(min_samples_split= 8, max_depth= 30)
+        classifier.fit(x_train, y_train)
+        y_pred = classifier.predict(x_test)
+        for j in range(len(y_pred)):
+            if y_pred[j] == y_test[j]:
+                positivos += 1
+            total += 1
+    return positivos/total
+print(precision(weather1, "Play"))
