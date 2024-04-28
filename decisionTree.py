@@ -64,15 +64,30 @@ class DecisionTreeClassifier:
     
     def b(self, q: float) -> float:
         return -(q*np.log2(q) + (1-q)*np.log2(1-q)) if q not in {0, 1} else 0
-    
-    def entropy(self, dataset: pd.DataFrame, feature: str) -> float: #REVER ??????
-        column = dataset[feature]
-        # Calculate entropy for a dataset
-        if column.empty or len(column.unique()) == 1:
-            return 0
-        value_counts = column.value_counts(normalize=True)
-        entropy = -(value_counts * np.log2(value_counts)).sum()
-        return entropy
+     
+    def gini_class(self, dataset: pd.DataFrame, feature): # Calcula o indice gini de cada valor em uma feature e retorna um dicionario com cada valor e seu respectivo resultado
+        _, target = self.split_features_target(dataset)
+        values_target = dataset[target].unique()
+        values_feature = dataset[feature].unique()
+        gini_dic = {}
+        tamanho_feature = len(dataset[feature])
+        for val in values_feature:
+            soma = 1
+            for j in values_target:
+                a = len(dataset[(dataset[feature]== val) & (dataset[target] == j)])
+                soma -= (a/tamanho_feature)**2
+            gini_dic[val] = soma
+        return gini_dic
+
+
+    def gini_split(self, dataset, feature): # calcula o indice gini total da feature 
+        dic = self.gini_class(dataset, feature)
+        values = dic.keys()
+        soma = 0
+        tamanho = len(dataset[feature])
+        for i in values:
+            soma += (len(dataset[dataset[feature] == i])/tamanho) * dic[i]
+        return soma
 
     def remainder(self, dataset: pd.DataFrame, feature: str) -> float:
         _, target = self.split_features_target(dataset)
@@ -89,6 +104,7 @@ class DecisionTreeClassifier:
             pk = k_class_counts.get(1, 0)  
             nk = k_class_counts.get(0, 0) 
             r += (pk + nk) / (p + n) * self.b(pk / (pk + nk))
+            
         return r
 
     def information_gain(self, dataset: pd.DataFrame, feature: str) -> float:
@@ -149,7 +165,8 @@ def subsets(df, target):
         no = df[df[target] == 0]
         return yes, no
 
-def split_representative(df, target: str, perc: float) -> float:
+def split_representative(df: pd.DataFrame, perc: float) -> float:
+        _, target = DecisionTreeClassifier().split_features_target(df)
         yes_per, _ = df[target].value_counts(normalize=True) # proporção de sims e naos
         yes_sub, no_sub = subsets(df, target)[0].index.values.tolist(),  subsets(df, target)[1].index.values.tolist()# o subconjunto de sins e naos representados pelo ID
         # Embaralhar os indices de sins e naos
@@ -186,11 +203,11 @@ def split_representative(df, target: str, perc: float) -> float:
 # A precisão será um valor entre 0 e 1:
 # print(precision) 
 
-def precision(dataframe, target):
+def precision(dataframe):
     positivos = 0
     total = 0
     for _ in range(20):
-        train_df, test_df = split_representative(dataframe, target, 0.3)
+        train_df, test_df = split_representative(dataframe, 0.2)
         x_train = train_df.iloc[:, :-1]
         y_train = train_df.iloc[:, -1]
 
@@ -204,4 +221,31 @@ def precision(dataframe, target):
                 positivos += 1
             total += 1
     return positivos/total
-# print(precision(df, 'Class'))
+print(precision(weather_df))
+
+
+def entropy(a) -> float:
+    # Handle potential empty DataFrames or attributes with no unique values
+    if len(a) == 0 or len(a.unique()) == 1:
+        return 0  # Entropy is 0 for empty datasets or single-valued attributes
+
+    # Vectorized implementation for efficiency using `groupby` and weighted entropy calculation
+    value_counts = a.value_counts(normalize=True)
+    entropy = -(value_counts * np.log2(value_counts)).sum()
+
+    return entropy
+
+def point_split(df, attribute, extremos: tuple): # função para avaliar onde fazer a melhor divisao (para biinario) em classes contínuas 
+    acc = []
+    b = df[attribute]
+    minorante, majorante = extremos
+    for i in range(minorante + 1, majorante):
+        a = pd.cut(b, bins=[minorante, i , majorante], labels=[0,1])
+        ent = entropy(a)
+        if ent == 0:
+            acc.append(1)
+        else:
+            acc.append(ent)
+    minimo = min(acc)
+    return (minimo,acc.index(minimo))
+print(point_split(weather_df, 'Temp', (50, 100)))

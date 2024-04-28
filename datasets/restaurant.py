@@ -1,8 +1,10 @@
 import pandas as pd
+import numpy as np
 
-pd.set_option('future.no_silent_downcasting', True)
+#pd.set_option('future.no_silent_downcasting', True)
 
 restaurant_df = pd.read_csv('datasets/restaurant.csv')
+
 
 restaurant_df = restaurant_df.drop('ID', axis=1)
 
