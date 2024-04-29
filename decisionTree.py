@@ -70,12 +70,12 @@ class DecisionTreeClassifier:
         values_target = dataset[target].unique()
         values_feature = dataset[feature].unique()
         gini_dic = {}
-        tamanho_feature = len(dataset[feature])
         for val in values_feature:
             soma = 1
             for j in values_target:
+                tamanho_val_feature = len(dataset[dataset[feature]== val])
                 a = len(dataset[(dataset[feature]== val) & (dataset[target] == j)])
-                soma -= (a/tamanho_feature)**2
+                soma -= (a/tamanho_val_feature)**2
             gini_dic[val] = soma
         return gini_dic
 
@@ -179,15 +179,16 @@ def split_representative(df: pd.DataFrame, perc: float) -> float:
 
         return train, test
         
-# train_df, test_df = split_representative(df, 'Class', 0.2)
-# x_train = train_df.iloc[:, :-1]
-# y_train = train_df.iloc[:, -1]
+train_df, test_df = split_representative(restaurant_df, 0.2)
+x_train = train_df.iloc[:, :-1]
+y_train = train_df.iloc[:, -1]
 
-# x_test = test_df.iloc[:, :-1]
-# y_test = test_df.iloc[:, -1]
+x_test = test_df.iloc[:, :-1]
+y_test = test_df.iloc[:, -1]
 
-# classifier = DecisionTreeClassifier(min_samples_split= 7, max_depth= 30)
-# classifier.fit(x_train, y_train)
+classifier = DecisionTreeClassifier(min_samples_split= 5, max_depth= 0)
+classifier.fit(x_train, y_train)
+classifier.print_tree(classifier.root)
 
 # print(classifier.predict(x_test))
 # print(y_test)
@@ -206,6 +207,7 @@ def split_representative(df: pd.DataFrame, perc: float) -> float:
 def precision(dataframe):
     positivos = 0
     total = 0
+
     for _ in range(20):
         train_df, test_df = split_representative(dataframe, 0.2)
         x_train = train_df.iloc[:, :-1]
@@ -221,7 +223,7 @@ def precision(dataframe):
                 positivos += 1
             total += 1
     return positivos/total
-print(precision(weather_df))
+print(precision(restaurant_df))
 
 
 def entropy(a) -> float:
@@ -235,17 +237,18 @@ def entropy(a) -> float:
 
     return entropy
 
-def point_split(df, attribute, extremos: tuple): # função para avaliar onde fazer a melhor divisao (para biinario) em classes contínuas 
+def point_split(df, attribute): # função para avaliar onde fazer a melhor divisao (para biinario) em classes contínuas 
     acc = []
     b = df[attribute]
-    minorante, majorante = extremos
-    for i in range(minorante + 1, majorante):
-        a = pd.cut(b, bins=[minorante, i , majorante], labels=[0,1])
+
+    minorante, majorante = df[attribute].min(), df[attribute].max()
+    ran = majorante - minorante
+    for i in range(int(ran / 2)):
+        a = pd.cut(b, bins=[minorante, minorante + i + 1, majorante - i, majorante + 1], labels=[0,1, 2])
         ent = entropy(a)
         if ent == 0:
             acc.append(1)
         else:
             acc.append(ent)
-    minimo = min(acc)
-    return (minimo,acc.index(minimo))
-print(point_split(weather_df, 'Temp', (50, 100)))
+    return acc
+print(point_split(weather_df, 'Temp'))
