@@ -5,6 +5,8 @@ from datasets.weather import weather_df
 '''
     Ideia: mudar o children para um dicionario assim no nó pai temos no dicionario condição: subtree
     Assim escusamos de usar o atributo condition e parece ser mais fácil na parte do predict
+
+    PERGUNTAR SE É PREFERIVEL TER PREVISAO MESMO QUE MAIS ERRADA OU NAO TER
 '''
 
 class Node:
@@ -25,7 +27,10 @@ class Node:
         
     def set_condition(self, condition: int) -> None:
         self.condition = condition
-        
+
+    def is_leaf(self) -> bool:
+        return len(self.children) == 0
+
     def __str__(self) -> str:
         return 'Feature: ' + self.feature + ' Filhos: ' + str(len(self.children))
         
@@ -51,19 +56,22 @@ class DecisionTreeClassifier:
             
             if best_split['info_gain'] < 1:
 
-                    children = []    
-                    remaining_features.remove( best_split['feature'] )
-                    for value, child_dataset in best_split['datasets'].items():
-                        
+                children = []    
+                remaining_features.remove( best_split['feature'] )
+                for value, child_dataset in best_split['datasets'].items():
 
+                    if child_dataset.empty: # caso para aquele valor nao houver nenhuma sample
+                        subtree = Node(condition= value, leaf_value= self.calculate_leaf_value(y))
+
+                    else: 
                         subtree = self.build_tree(dataset= child_dataset, remaining_features= remaining_features, cur_depth= cur_depth+1)
                         subtree.set_condition(value) #o valor é a condição referente à feature do pai
-                        children.append(subtree)
-                        
-                    return Node(feature= best_split['feature'], info_gain= best_split['info_gain'], children= children)
+
+                    children.append(subtree)
+                    
+                return Node(feature= best_split['feature'], info_gain= best_split['info_gain'], children= children)
         
-        leaf_value = self.calculate_leaf_value(y)
-        return Node(leaf_value= leaf_value)     
+        return Node(leaf_value= self.calculate_leaf_value(y))     
     
     #Cálculo de gini
     def gini_class(self, dataset: pd.DataFrame, feature: str) -> dict: # Calcula o indice gini de cada valor em uma feature e retorna um dicionario com cada valor e seu respectivo resultado
@@ -127,14 +135,9 @@ class DecisionTreeClassifier:
 
     #obtem o melhor split de dados
     def get_best_split(self, dataset: pd.DataFrame, features: list) -> dict: #dict com feature, info_gain e k: k_dataset
-        # _, target = self.split_features_target(dataset)
-        
-        #verificar se a target é binaria ou nao
-        # if len(dataset[target].unique()) <= 2:
-        #     feature, gain = self.max_info_gain(dataset)
-        # else:
         feature, gain = self.max_gini(dataset, features)
-        feature_values = dataset[feature].unique()
+        feature_values = self.original_dataset[feature].unique() #valores do original para haver sempre todos os ramos na arvore
+
         child_datasets = {}
         for value in feature_values: #separa em datasets filhos para cada valor da feature
             child_dataset = dataset[dataset[feature] == value]
@@ -154,6 +157,7 @@ class DecisionTreeClassifier:
     #construçao da DT
     def fit(self, x: pd.DataFrame, y: pd.DataFrame) -> None: 
         dataset = pd.concat((x,y), axis=1)
+        self.original_dataset = dataset
         features = x.columns.to_list()
         self.root = self.build_tree(dataset= dataset, remaining_features= features)
         
@@ -176,7 +180,10 @@ class DecisionTreeClassifier:
         if node.leaf_value is not None:
             print(indent + "Condition: " + str(node.condition) + "|   Leaf Value: ", node.leaf_value)
             return
-        print(indent + "Feature:" + node.feature + "|   Condition: " + str(node.condition))
+        elif node.condition is None:
+            print(indent + "Feature: " + node.feature)
+        else:
+            print(indent + "Condition: " + str(node.condition) + "|   Feature: " + node.feature)
         for child in node.children:
             self.print_tree(child, indent + "   ")
 
@@ -198,34 +205,8 @@ def split_representative(df: pd.DataFrame, perc: float) -> float:
         train = df.iloc[[*total_yes[num_yes:], *total_no[num_no:]]] # indices para treino 
 
         return train, test
-        
-train_df, test_df = split_representative(restaurant_df, 0.2)
-x_train = train_df.iloc[:, :-1]
-y_train = train_df.iloc[:, -1]
 
-x_test = test_df.iloc[:, :-1]
-y_test = test_df.iloc[:, -1]
-
-classifier = DecisionTreeClassifier(min_samples_split= 5, max_depth= 0)
-classifier = DecisionTreeClassifier(min_samples_split= 3, max_depth= 3)
-classifier.fit(x_train, y_train)
-classifier.print_tree(classifier.root)
-
-# print(classifier.predict(x_test))
-# print(y_test)
-
-# from sklearn.metrics import precision_score
-
-# # Suponha que você tenha os seguintes rótulos verdadeiros e previstos pelo modelo:
-# y_pred = classifier.predict(x_test)
-# print(y_pred)
-# # Para calcular a precisão, basta chamar a função "precision_score" passando os rótulos verdadeiros e previstos como argumentos:
-# precision = precision_score(y_test, y_pred)
-
-# A precisão será um valor entre 0 e 1:
-# print(precision) 
-
-def precision(dataframe):
+def precision(dataframe: pd.DataFrame) -> float:
     positivos = 0
     total = 0
 
@@ -244,8 +225,6 @@ def precision(dataframe):
                 positivos += 1
             total += 1
     return positivos/total
-print(precision(restaurant_df))
-
 
 def entropy(a) -> float:
     # Handle potential empty DataFrames or attributes with no unique values
@@ -255,10 +234,9 @@ def entropy(a) -> float:
     # Vectorized implementation for efficiency using `groupby` and weighted entropy calculation
     value_counts = a.value_counts(normalize=True)
     entropy = -(value_counts * np.log2(value_counts)).sum()
-
     return entropy
 
-def point_split(df, attribute): # função para avaliar onde fazer a melhor divisao (para biinario) em classes contínuas 
+def point_split(df: pd.DataFrame, attribute: str): # função para avaliar onde fazer a melhor divisao (para biinario) em classes contínuas 
     acc = []
     b = df[attribute]
 
@@ -273,4 +251,16 @@ def point_split(df, attribute): # função para avaliar onde fazer a melhor divi
             acc.append(ent)
     minimo = min(acc)
     return (minimo,acc.index(minimo))
-# print(point_split(weather_df, 'Temp', (50, 100)))
+    
+train_df, test_df = split_representative(restaurant_df, 0.2)
+x_train = train_df.iloc[:, :-1]
+y_train = train_df.iloc[:, -1]
+
+x_test = test_df.iloc[:, :-1]
+y_test = test_df.iloc[:, -1]
+
+classifier = DecisionTreeClassifier(min_samples_split= 2, max_depth= 3)
+classifier.fit(x_train, y_train)
+classifier.print_tree(classifier.root)
+
+print(precision(restaurant_df))

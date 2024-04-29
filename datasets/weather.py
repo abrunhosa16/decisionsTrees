@@ -14,7 +14,7 @@ weather_dict = {'rainy': 0, 'overcast': 1, 'sunny': 2}
 weather_df['Weather'] = weather_df['Weather'].map(weather_dict)
 
  
-#weather_df['Temp']  = pd.cut(weather_df['Temp'], bins=[50, 64, 100], labels=[0,1])
+weather_df['Temp']  = pd.cut(weather_df['Temp'], bins=[50, 64, 100], labels=[0,1])
 weather_df['Humidity'] = pd.cut(weather_df['Humidity'], bins=[60, 76, 100], labels=[0,1] )
 # no weather.ipynb fiz a avaliação dos quartis Temp e humidity para a seleção dos bins 
 # se lê bins=[50, 67, 74, 79, 100] primeiro intervalo de 50 a 67, segundo 67 a 74 ..., o numero de labels precisam ser len(bins) - 1
