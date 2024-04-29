@@ -74,7 +74,9 @@ class DecisionTreeClassifier:
         for val in values_feature:
             soma = 1
             for j in values_target:
+
                 tamanho_val_feature = len(dataset[dataset[feature]== val])
+                    
                 a = len(dataset[(dataset[feature]== val) & (dataset[target] == j)])
                 soma -= (a/tamanho_val_feature)**2
             gini_dic[val] = soma
@@ -181,14 +183,19 @@ class DecisionTreeClassifier:
             self.print_tree(child, indent + "   ")
 
 def subsets(df, target):
-        yes = df[df[target] == 1]
-        no = df[df[target] == 0]
-        return yes, no
+    return [np.random.choice(df[df[target] == i].index.values.tolist(), size=len(df[df[target] == i]), replace=False) for i in df[target].unique()]
+
+def stratify(df:pd.DataFrame, perc): # generalização do split representative still not working 
+    _, target = DecisionTreeClassifier().split_features_target(df)
+    values_prop = df[target].value_counts(normalize= True)
+    values_sub = subsets(df, target)
+    num_test = math.ceil(perc * df.shape[0])
+    return None
 
 def split_representative(df: pd.DataFrame, perc: float) -> float:
         _, target = DecisionTreeClassifier().split_features_target(df)
         yes_per, _ = df[target].value_counts(normalize=True) # proporção de sims e naos
-        yes_sub, no_sub = subsets(df, target)[0].index.values.tolist(),  subsets(df, target)[1].index.values.tolist()# o subconjunto de sins e naos representados pelo ID
+        yes_sub, no_sub = subsets(df, target)[0],  subsets(df, target)[1] # o subconjunto de sins e naos representados pelo ID
         # Embaralhar os indices de sins e naos
         total_yes, total_no = np.random.choice(yes_sub, size=len(yes_sub), replace=False), np.random.choice(no_sub, size=len(no_sub), replace=False)
         num_train = math.ceil(perc * df.shape[0])
@@ -199,17 +206,17 @@ def split_representative(df: pd.DataFrame, perc: float) -> float:
 
         return train, test
         
-train_df, test_df = split_representative(restaurant_df, 0.2)
-x_train = train_df.iloc[:, :-1]
-y_train = train_df.iloc[:, -1]
+# train_df, test_df = split_representative(restaurant_df, 0.2)
+# x_train = train_df.iloc[:, :-1]
+# y_train = train_df.iloc[:, -1]
 
-x_test = test_df.iloc[:, :-1]
-y_test = test_df.iloc[:, -1]
+# x_test = test_df.iloc[:, :-1]
+# y_test = test_df.iloc[:, -1]
 
-classifier = DecisionTreeClassifier(min_samples_split= 5, max_depth= 0)
-classifier = DecisionTreeClassifier(min_samples_split= 3, max_depth= 3)
-classifier.fit(x_train, y_train)
-classifier.print_tree(classifier.root)
+# classifier = DecisionTreeClassifier(min_samples_split= 5, max_depth= 0)
+# classifier = DecisionTreeClassifier(min_samples_split= 3, max_depth= 3)
+# classifier.fit(x_train, y_train)
+# classifier.print_tree(classifier.root)
 
 # print(classifier.predict(x_test))
 # print(y_test)
@@ -236,7 +243,7 @@ def precision(dataframe):
 
         x_test = test_df.iloc[:, :-1]
         y_test = test_df.iloc[:, -1].tolist()
-        classifier = DecisionTreeClassifier(min_samples_split= 8, max_depth= 30)
+        classifier = DecisionTreeClassifier(min_samples_split= 4, max_depth= 20)
         classifier.fit(x_train, y_train)
         y_pred = classifier.predict(x_test)
         for j in range(len(y_pred)):
@@ -244,7 +251,7 @@ def precision(dataframe):
                 positivos += 1
             total += 1
     return positivos/total
-print(precision(restaurant_df))
+#print(precision(weather_df))
 
 
 def entropy(a) -> float:
@@ -258,19 +265,21 @@ def entropy(a) -> float:
 
     return entropy
 
-def point_split(df, attribute): # função para avaliar onde fazer a melhor divisao (para biinario) em classes contínuas 
+
+
+def point_split(df, attribute, extremos): # função para avaliar onde fazer a melhor divisao (para binario) em classes contínuas  not working 
     acc = []
     b = df[attribute]
-
-    minorante, majorante = df[attribute].min(), df[attribute].max()
-    ran = majorante - minorante
-    for i in range(int(ran / 2)):
-        a = pd.cut(b, bins=[minorante, minorante + i + 1, majorante - i, majorante + 1], labels=[0,1, 2])
-        ent = entropy(a)
-        if ent == 0:
-            acc.append(1)
-        else:
-            acc.append(ent)
-    minimo = min(acc)
-    return (minimo,acc.index(minimo))
-# print(point_split(weather_df, 'Temp', (50, 100)))
+    minorante, majorante = extremos
+    num_min, num_max = df[attribute].min(), df[attribute].max()
+    ran = num_max - num_min
+    ran = int(ran/2)
+    for i in range(ran):
+        a = pd.cut(b, bins=[minorante, num_min + i, num_max - i, majorante + 1], labels=[0,1, 2])
+        #print(a)
+    #minimo = min(acc)
+    m, n = acc.index(max(acc)) + num_min, num_max - acc.index(max(acc))
+    print(m,n)
+    print(acc)
+    return 
+#print(point_split(weather_df, 'Temp', (50, 100)))
