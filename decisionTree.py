@@ -176,9 +176,10 @@ class DecisionTreeClassifier:
                 return self.make_prediction(x, child)
         print('ERROR')
         
-    def print_tree(self, node: Node, indent= ""):
+    def print_tree(self, node: Node= None, indent= ""):
         if node is None:
-            return
+            node = self.root
+            
         if node.leaf_value is not None:
             print(indent + "Condition: " + str(node.condition) + "|   Leaf Value: ", node.leaf_value)
             return
@@ -261,3 +262,11 @@ def point_split(df, attribute, extremos): # função para avaliar onde fazer a m
     print(acc)
     return 
 #print(point_split(weather_df, 'Temp', (50, 100)))
+
+train, test = split_representative(weather_df, 0.2)
+x_train, y_train = train[train.columns[:-1]], train[train.columns[-1]]
+x_test, y_test = test[test.columns[:-1]], test[test.columns[-1]]
+
+classifier = DecisionTreeClassifier(min_samples_split= 2, max_depth= 3)
+classifier.fit(x_train, y_train)
+classifier.print_tree()
