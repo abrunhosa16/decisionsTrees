@@ -1,6 +1,7 @@
-import pandas as pd, numpy as np, math
+import pandas as pd, numpy as np, math, itertools
 from datasets.restaurant import restaurant_df
 from datasets.weather import weather_df
+from datasets.iris import iris_df
 
 '''
     Ideia: mudar o children para um dicionario assim no nó pai temos no dicionario condição: subtree
@@ -175,6 +176,32 @@ class DecisionTreeClassifier:
             if feature_value == child.condition:
                 return self.make_prediction(x, child)
         print('ERROR')
+
+    def subsets(self, df, target):
+        return [np.random.choice(df[df[target] == i].index.values.tolist(), size=len(df[df[target] == i]), replace=False) for i in df[target].unique()]
+
+    def stratify(self, df:pd.DataFrame, perc): # generalização do split representative working 
+        _, target = self.split_features_target(df)
+        sample_test = math.ceil(perc * df.shape[0])
+        values_prop = df[target].value_counts(normalize= True) * sample_test
+        quantidade = values_prop.map(round)
+        values_sub = self.subsets(df, target)
+        acc_test = []
+        acc_train = []
+        for i in range(len(quantidade)):
+            quant = quantidade[i]
+            acc_test.append(values_sub[i][:quant])
+            acc_train.append(values_sub[i][quant : ])
+
+        list_test = list(itertools.chain.from_iterable(acc_test))
+        list_train = list(itertools.chain.from_iterable(acc_train))
+        acc_test = np.random.choice(list_test, size = len(list_test), replace=False)
+        acc_test, exc = acc_test[:sample_test], acc_test[sample_test:]
+        list_train.extend(exc)
+        test = df.iloc[acc_test]
+        train = df.iloc[list_train]
+
+        return train, test
         
     def print_tree(self, node: Node= None, indent= ""):
         if node is None:
@@ -190,20 +217,12 @@ class DecisionTreeClassifier:
         for child in node.children:
             self.print_tree(child, indent + "   ")
 
-def subsets(df, target):
-    return [np.random.choice(df[df[target] == i].index.values.tolist(), size=len(df[df[target] == i]), replace=False) for i in df[target].unique()]
 
-def stratify(df:pd.DataFrame, perc): # generalização do split representative still not working 
-    _, target = DecisionTreeClassifier().split_features_target(df)
-    values_prop = df[target].value_counts(normalize= True)
-    values_sub = subsets(df, target)
-    num_test = math.ceil(perc * df.shape[0])
-    return None
 
 def split_representative(df: pd.DataFrame, perc: float) -> float:
         _, target = DecisionTreeClassifier().split_features_target(df)
         yes_per, _ = df[target].value_counts(normalize=True) # proporção de sims e naos
-        yes_sub, no_sub = subsets(df, target)[0],  subsets(df, target)[1] # o subconjunto de sins e naos representados pelo ID
+        yes_sub, no_sub = DecisionTreeClassifier().subsets(df, target)[0],  DecisionTreeClassifier().subsets(df, target)[1] # o subconjunto de sins e naos representados pelo ID
         # Embaralhar os indices de sins e naos
         total_yes, total_no = np.random.choice(yes_sub, size=len(yes_sub), replace=False), np.random.choice(no_sub, size=len(no_sub), replace=False)
         num_train = math.ceil(perc * df.shape[0])
@@ -219,13 +238,14 @@ def precision(dataframe: pd.DataFrame) -> float:
     total = 0
 
     for _ in range(20):
-        train_df, test_df = split_representative(dataframe, 0.2)
+        classifier = DecisionTreeClassifier(min_samples_split= 4, max_depth= 20)
+
+        train_df, test_df = classifier.stratify(dataframe, 0.2)
         x_train = train_df.iloc[:, :-1]
         y_train = train_df.iloc[:, -1]
 
         x_test = test_df.iloc[:, :-1]
         y_test = test_df.iloc[:, -1].tolist()
-        classifier = DecisionTreeClassifier(min_samples_split= 4, max_depth= 20)
         classifier.fit(x_train, y_train)
         y_pred = classifier.predict(x_test)
         for j in range(len(y_pred)):
@@ -233,6 +253,9 @@ def precision(dataframe: pd.DataFrame) -> float:
                 positivos += 1
             total += 1
     return positivos/total
+
+print(precision(restaurant_df))
+
 
 def entropy(a) -> float:
     # Handle potential empty DataFrames or attributes with no unique values
@@ -267,6 +290,6 @@ train, test = split_representative(weather_df, 0.2)
 x_train, y_train = train[train.columns[:-1]], train[train.columns[-1]]
 x_test, y_test = test[test.columns[:-1]], test[test.columns[-1]]
 
-classifier = DecisionTreeClassifier(min_samples_split= 2, max_depth= 3)
-classifier.fit(x_train, y_train)
-classifier.print_tree()
+# classifier = DecisionTreeClassifier(min_samples_split= 2, max_depth= 3)
+# classifier.fit(x_train, y_train)
+# classifier.print_tree()

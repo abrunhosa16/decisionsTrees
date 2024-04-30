@@ -5,12 +5,12 @@ from sklearn import metrics #Import scikit-learn metrics module for accuracy cal
 from datasets.restaurant import restaurant_df
 
 #split dataset in features and target variable
-feature_cols = ['Alt', 'Bar', 'Fri', 'Hun', 'Rain', 'Res', 'Full', 'None','Some', '$', '$$', '$$$', 'Burger', 'French', 'Italian', 'Thai', '0-10','10-30', '30-60', '>60']
+feature_cols = restaurant_df.columns[:-1]
 X = restaurant_df[feature_cols] # Features
 y = restaurant_df.Class # Target variable
 
 # Split dataset into training set and test set
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1) # 70% training and 30% test
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1) # 80% training and 20% test
 
 # Create Decision Tree classifer object
 clf = DecisionTreeClassifier()
