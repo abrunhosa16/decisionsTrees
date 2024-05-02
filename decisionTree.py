@@ -169,13 +169,14 @@ class DecisionTreeClassifier:
         return predictions
     
     def make_prediction(self, x: pd.Series, tree: Node) -> int:
-        if tree.leaf_value != None: 
+        if tree.is_leaf(): 
             return tree.leaf_value
         feature_value = x[tree.feature]
         for child in tree.children:
             if feature_value == child.condition:
                 return self.make_prediction(x, child)
-        print('ERROR')
+        print(x)
+        print('No prediction')
 
     def subsets(self, df, target):
         return [np.random.choice(df[df[target] == i].index.values.tolist(), size=len(df[df[target] == i]), replace=False) for i in df[target].unique()]
@@ -256,7 +257,6 @@ def precision(dataframe: pd.DataFrame) -> float:
 
 print(precision(restaurant_df))
 
-
 def entropy(a) -> float:
     # Handle potential empty DataFrames or attributes with no unique values
     if len(a) == 0 or len(a.unique()) == 1:
@@ -286,10 +286,10 @@ def point_split(df, attribute, extremos): # função para avaliar onde fazer a m
     return 
 #print(point_split(weather_df, 'Temp', (50, 100)))
 
-train, test = split_representative(weather_df, 0.2)
+train, test = split_representative(restaurant_df, 0.2)
 x_train, y_train = train[train.columns[:-1]], train[train.columns[-1]]
 x_test, y_test = test[test.columns[:-1]], test[test.columns[-1]]
 
-# classifier = DecisionTreeClassifier(min_samples_split= 2, max_depth= 3)
-# classifier.fit(x_train, y_train)
-# classifier.print_tree()
+classifier = DecisionTreeClassifier(min_samples_split= 2, max_depth= 3)
+classifier.fit(x_train, y_train)
+classifier.print_tree()

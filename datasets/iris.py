@@ -1,17 +1,15 @@
-import pandas as pd, numpy as np, seaborn, matplotlib.pyplot as plt
+import pandas as pd, numpy as np, seaborn, matplotlib.pyplot as plt, warnings
 
 '''
     formas de separar var. continuas: equal interval width, equal frequency, k-means
 '''
 
+warnings.filterwarnings("ignore") #para ignorar alguns warnings que nao percebi o q era
+
 iris_df = pd.read_csv('datasets/iris.csv')
 
 class_dict = {'Iris-setosa': 0, 'Iris-versicolor': 1, 'Iris-virginica': 2}
 iris_df['class'] = iris_df['class'].map(class_dict)
-
-# iris_df = discrete_dataset(iris_df, 4, eq_frequency)
-# seaborn.pairplot(iris_df, hue='sepallength_discrete', vars=[ 'sepallength',  'sepalwidth',  'petallength',  'petalwidth' ])
-# plt.show()
 
 class PreprocessData:
     def __init__(self, dataset: pd.DataFrame) -> None:
@@ -54,7 +52,6 @@ class PreprocessData:
                 feature_dic[ idx ] = [split_values[idx - 1], split_value]
         
         self.codification[ feature ] = ['eq_frequency', feature_dic]
-        
         return self.dataset
 
     def eq_interval_width(self, n_classes: int, feature: str) -> pd.DataFrame:
@@ -161,5 +158,4 @@ class PreprocessData:
                 self.dataset = func(n_classes, feature)
                 
 process = PreprocessData(iris_df)
-process.discrete_dataset(3, process.k_means)
-print(process.dataset)
+process.discrete_dataset(3, process.k_means)    
