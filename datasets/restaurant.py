@@ -22,4 +22,3 @@ for feature, mapping in dic.items():
     restaurant_df[feature] = restaurant_df[feature].map(mapping)
     
 restaurant_df = restaurant_df.replace(binary)
-#print(restaurant_df)

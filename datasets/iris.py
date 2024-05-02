@@ -185,11 +185,11 @@ class PreprocessData:
 
         return new_row
                 
-process = PreprocessData(iris_df)
-process.discretize_dataset(3, process.k_means)    
-print(process.codification)
+# process = PreprocessData(iris_df)
+# process.discretize_dataset(3, process.k_means)    
+# print(process.codification)
 
-X = iris_df.iloc[3]
-X = X.drop(['ID', 'class'])
-print(X)
-print(process.discretize_row(X))
+# X = iris_df.iloc[3]
+# X = X.drop(['ID', 'class'])
+# print(X)
+# print(process.discretize_row(X))
