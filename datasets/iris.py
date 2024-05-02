@@ -15,7 +15,8 @@ class PreprocessData:
     def __init__(self, dataset: pd.DataFrame) -> None:
         self.dataset = dataset
         self.codification = {}
-    
+        self.continuous_features = []
+
     def get_insert_position(self, l: list, value) -> int:
         for idx, i in enumerate(l):
             if value <= i:
@@ -152,10 +153,43 @@ class PreprocessData:
         self.codification[feature] = ['k_means', feature_dic]
         return X
         
-    def discrete_dataset(self, n_classes: int, func) -> None:
+    def discretize_dataset(self, n_classes: int, func) -> None:
         for feature in self.dataset.columns:
             if self.dataset[feature].dtype == float:
+                self.continuous_features.append(feature)
                 self.dataset = func(n_classes, feature)
+
+    def discretize_row(self, row: pd.Series):
+        new_row = []
+        for feature in self.continuous_features: #percorre todas as features continuas
+
+            type_cod, dic = self.codification[feature]
+
+            if type_cod == 'k_means': #se o tipo de codificaçao usada for k_means
+
+                min_dist = [-1, float('inf')]
+                
+                for cls, centroid in dic.items():
+                    dist = abs(row[feature] - centroid) #distancia do ponto ao centroid
+                    if dist < min_dist[1]:
+                        min_dist = [cls, dist]
+
+                new_row.append( min_dist[0] )
+                
+            else:
+
+                for cls, interval in dic.items():
+                    if row[feature] > interval[0] and row[feature] <= interval[1]:
+                        new_row.append( cls )
+                        break
+
+        return new_row
                 
 process = PreprocessData(iris_df)
-process.discrete_dataset(3, process.k_means)    
+process.discretize_dataset(3, process.k_means)    
+print(process.codification)
+
+X = iris_df.iloc[3]
+X = X.drop(['ID', 'class'])
+print(X)
+print(process.discretize_row(X))

@@ -290,6 +290,8 @@ train, test = split_representative(restaurant_df, 0.2)
 x_train, y_train = train[train.columns[:-1]], train[train.columns[-1]]
 x_test, y_test = test[test.columns[:-1]], test[test.columns[-1]]
 
+print(type(x_test))
+
 classifier = DecisionTreeClassifier(min_samples_split= 2, max_depth= 3)
 classifier.fit(x_train, y_train)
 classifier.print_tree()
