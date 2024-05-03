@@ -36,41 +36,49 @@ class Node:
         return 'Feature: ' + self.feature + ' Filhos: ' + str(len(self.children))
         
 class DecisionTreeClassifier:
-    def __init__(self, min_samples_split: int= 2, max_depth: int= 2) -> None:
+    def __init__(self) -> None:
         self.root = None
-        
-        self.min_samples_split = min_samples_split
-        self.max_depth = max_depth
     
-    def split_features_target(self, dataset: pd.DataFrame) -> list: #return lista com nome das features e o target
+    #retorna features e target
+    def split_features_target(self, dataset: pd.DataFrame) -> list:
         return dataset.columns[:-1], dataset.columns[-1]
         
-    def build_tree(self, dataset: pd.DataFrame, remaining_features: list, cur_depth: int= 1) -> Node:
+    #avalia se todos os valores do target são iguais
+    def same_class(self, dataset: pd.DataFrame, target: str) -> bool:
+        return dataset[target].value_counts().max() == dataset.shape[0]
+        
+    def build_tree(self, dataset: pd.DataFrame, remaining_features: list, parent_dataset: pd.DataFrame) -> Node:
         _, target = self.split_features_target(dataset)
-        x = dataset[remaining_features] 
+        x = dataset[remaining_features]
         y = dataset[target]
         
-        num_samples, _ = x.shape
+        if dataset.shape[0] == 0:
+            return Node(leaf_value= self.calculate_leaf_value( parent_dataset[target] ))
         
-        if num_samples >= self.min_samples_split and cur_depth <= self.max_depth and len(remaining_features) > 0:
-            best_split = self.get_best_split(dataset, remaining_features) # dict com feature, info_gain, k: k_dataset
+        elif self.same_class(dataset= dataset, target= target):
+            return Node(leaf_value= self.calculate_leaf_value( dataset[target] ))
+        
+        elif len(remaining_features) == 0:
+            return Node(leaf_value= self.calculate_leaf_value( dataset[target] ))
             
-            if best_split['info_gain'] < 1:
+        best_split = self.get_best_split(dataset, remaining_features) # dict com feature, info_gain, k: k_dataset
+        
+        if best_split['info_gain'] < 1:
 
-                children = []    
-                remaining_features.remove( best_split['feature'] )
-                for value, child_dataset in best_split['datasets'].items():
+            children = []    
+            remaining_features.remove( best_split['feature'] )
+            for value, child_dataset in best_split['datasets'].items():
 
-                    if child_dataset.empty: # caso para aquele valor nao houver nenhuma sample
-                        subtree = Node(condition= value, leaf_value= self.calculate_leaf_value(y))
+                if child_dataset.empty: # caso para aquele valor nao houver nenhuma sample
+                    subtree = Node(condition= value, leaf_value= self.calculate_leaf_value(y))
 
-                    else: 
-                        subtree = self.build_tree(dataset= child_dataset, remaining_features= remaining_features, cur_depth= cur_depth+1)
-                        subtree.set_condition(value) #o valor é a condição referente à feature do pai
+                else: 
+                    subtree = self.build_tree(dataset= child_dataset, remaining_features= remaining_features, parent_dataset= dataset)
+                    subtree.set_condition(value) #o valor é a condição referente à feature do pai
 
-                    children.append(subtree)
-                    
-                return Node(feature= best_split['feature'], info_gain= best_split['info_gain'], children= children)
+                children.append(subtree)
+                
+            return Node(feature= best_split['feature'], info_gain= best_split['info_gain'], children= children)
         
         return Node(leaf_value= self.calculate_leaf_value(y))     
     
@@ -162,7 +170,7 @@ class DecisionTreeClassifier:
         dataset = pd.concat((x,y), axis=1)
         self.original_dataset = dataset
         features = x.columns.to_list()
-        self.root = self.build_tree(dataset= dataset, remaining_features= features)
+        self.root = self.build_tree(dataset= dataset, remaining_features= features, parent_dataset= dataset)
         
     def predict(self, X: pd.DataFrame) -> list:
         predictions = [self.make_prediction(row, self.root) for _, row in X.iterrows()]
@@ -239,7 +247,7 @@ def precision(dataframe: pd.DataFrame) -> float:
     total = 0
 
     for _ in range(20):
-        classifier = DecisionTreeClassifier(min_samples_split= 4, max_depth= 20)
+        classifier = DecisionTreeClassifier()
 
         train_df, test_df = classifier.stratify(dataframe, 0.2)
         x_train = train_df.iloc[:, :-1]
@@ -292,6 +300,6 @@ x_test, y_test = test[test.columns[:-1]], test[test.columns[-1]]
 
 print(type(x_test))
 
-classifier = DecisionTreeClassifier(min_samples_split= 2, max_depth= 3)
+classifier = DecisionTreeClassifier()
 classifier.fit(x_train, y_train)
 classifier.print_tree()
