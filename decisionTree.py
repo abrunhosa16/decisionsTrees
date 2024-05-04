@@ -289,7 +289,7 @@ class DecisionTreeClassifier:
 
                 tamanho_val_feature = len(dataset[dataset[feature]== val])
                     
-                a = len(dataset[(dataset[feature]== val) & (dataset[target] == j)])
+                a = dataset[(dataset[feature]== val) & (dataset[target] == j)].shape[0]
                 soma -= (a/tamanho_val_feature)**2
             gini_dic[val] = soma
         return gini_dic
@@ -460,15 +460,47 @@ def precision(dataframe: pd.DataFrame) -> float:
 
 # print(precision(restaurant_df))
 
-def entropy(a) -> float:
+def entropy_df(df) -> float:
+    _, target = DecisionTreeClassifier().split_features_target(df)
+    df = df[target]
     # Handle potential empty DataFrames or attributes with no unique values
-    if len(a) == 0 or len(a.unique()) == 1:
+    if len(df) == 0 or len(df.unique()) == 1:
         return 0  # Entropy is 0 for empty datasets or single-valued attributes
-
     # Vectorized implementation for efficiency using `groupby` and weighted entropy calculation
-    value_counts = a.value_counts(normalize=True)
+    value_counts = df.value_counts(normalize=True)
     entropy = -(value_counts * np.log2(value_counts)).sum()
     return entropy
+
+def entropy_class(dataset: pd.DataFrame, feature):
+    _, target = DecisionTreeClassifier().split_features_target(dataset)
+    values_target = dataset[target].unique()
+    values_feature = dataset[feature].unique()
+    entropy_dic = {}
+    for val in values_feature:
+        soma = 0
+        for j in values_target:
+            tamanho_val_feature = dataset[dataset[feature]== val].shape[0]
+                
+            a = dataset[(dataset[feature]== val) & (dataset[target] == j)].shape[0]
+            if a == 0:
+                continue
+            else:
+                prob = a/tamanho_val_feature
+                soma +=  -(prob)*np.log2(prob)
+        entropy_dic[val] = soma
+    return entropy_dic
+
+def entropy_split(dataset, feature):
+        dic = entropy_class(dataset, feature)
+        values = dic.keys()
+        soma = 0
+        tamanho = len(dataset[feature])
+        for i in values:
+            soma += (len(dataset[dataset[feature] == i])/tamanho) * dic[i]
+        return soma
+
+def info_gain(dataset, feature):
+    return entropy_df(dataset) - entropy_split(dataset, feature)
 
 
 
@@ -487,14 +519,19 @@ def point_split(df, attribute, extremos): # função para avaliar onde fazer a m
     print(m,n)
     print(acc)
     return 
-#print(point_split(weather_df, 'Temp', (50, 100)))
 
-# train, test = split_representative(restaurant_df, 0.2)
-# x_train, y_train = train[train.columns[:-1]], train[train.columns[-1]]
-# x_test, y_test = test[test.columns[:-1]], test[test.columns[-1]]
 
-# print(type(x_test))
 
-# classifier = DecisionTreeClassifier()
-# classifier.fit(x_train, y_train)
-# classifier.print_tree()
+def calc_entropy(feature_value_data, label, class_list):
+    class_count = feature_value_data.shape[0]
+    class_list, target = DecisionTreeClassifier.split_features_target()
+    entropy = 0
+    
+    for c in class_list:
+        label_class_count = feature_value_data[feature_value_data[label] == c].shape[0] #row count of class c 
+        entropy_class = 0
+        if label_class_count != 0:
+            probability_class = label_class_count/class_count #probability of the class
+            entropy_class = - probability_class * np.log2(probability_class)  #entropy
+        entropy += entropy_class
+    return entropy
