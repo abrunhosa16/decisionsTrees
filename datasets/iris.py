@@ -186,7 +186,8 @@ class PreprocessData:
         return new_row
                 
 process = PreprocessData(iris_df)
-process.discretize_dataset(3, process.k_means)    
+process.discretize_dataset(3, process.k_means)  
+print(process.dataset)  
 print(process.codification)
 
 X = iris_df.iloc[3]
