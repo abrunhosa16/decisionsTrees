@@ -168,6 +168,7 @@ class PreprocessData:
             elif self.dataset[feature].dtype == object or self.dataset[feature].dtype == bool:
                 self.categoric_features.append(feature)
                 self.to_numeric(feature= feature)
+        self.dataset = self.dataset.drop('ID', axis= 1)
 
     #prepara uma linha para ser usada na previsão
     def prepare_row(self, row: pd.Series):
@@ -200,11 +201,6 @@ class PreprocessData:
                 new_row.append( dic.get(value) )
         return new_row
 
-dataset = PreprocessData(weather_df)
-dataset.prepare_dataset(n_classes= 3, func= dataset.k_means)
-print(dataset.dataset)
-
-
 class Node:
     def __init__(self, feature: int= None, condition: int = None, children: list= [], info_gain: float= None, leaf_value: int= None) -> None:
         #nós de decisão
@@ -228,59 +224,98 @@ class Node:
         return len(self.children) == 0
 
     def __str__(self) -> str:
-        return 'Feature: ' + self.feature + ' Filhos: ' + str(len(self.children))
+        return 'Feature: ' + self.feature + '| Filhos: ' + str(len(self.children))
         
 class DecisionTreeClassifier:
     def __init__(self) -> None:
         self.root = None
+        self.target = None
     
     #retorna features e target
     def split_features_target(self, dataset: pd.DataFrame) -> list:
-        return dataset.columns[:-1], dataset.columns[-1]
+        return dataset.columns.to_list()[:-1], dataset.columns[-1]
         
     #avalia se todos os valores do target são iguais
-    def same_class(self, dataset: pd.DataFrame, target: str) -> bool:
-        return dataset[target].value_counts().max() == dataset.shape[0]
+    def same_class(self, dataset: pd.DataFrame) -> bool:
+        return dataset[self.target].value_counts().max() == dataset.shape[0]
         
     def build_tree(self, dataset: pd.DataFrame, remaining_features: list, parent_dataset: pd.DataFrame) -> Node:
-        _, target = self.split_features_target(dataset)
-        x = dataset[remaining_features]
-        y = dataset[target]
+        y = dataset[self.target]
         
+        #sem samples restantes
         if dataset.shape[0] == 0:
-            return Node(leaf_value= self.calculate_leaf_value( parent_dataset[target] ))
+            return Node(leaf_value= self.calculate_leaf_value( parent_dataset[ self.target ] ))
         
-        elif self.same_class(dataset= dataset, target= target):
-            return Node(leaf_value= self.calculate_leaf_value( dataset[target] ))
+        #todas as samples são da mesma classe
+        elif self.same_class(dataset= dataset):
+            return Node(leaf_value= self.calculate_leaf_value( dataset[ self.target ] ))
         
+        #sem atributos restantes
         elif len(remaining_features) == 0:
-            return Node(leaf_value= self.calculate_leaf_value( dataset[target] ))
+            return Node(leaf_value= self.calculate_leaf_value( dataset[ self.target ] ))
             
-        best_split = self.get_best_split(dataset, remaining_features) # dict com feature, info_gain, k: k_dataset
-        
-        if best_split['info_gain'] < 1:
-
-            children = []    
+        else:
+            best_split = self.get_best_split(dataset= dataset, features= remaining_features) # dict com feature, info_gain, k: k_dataset
             remaining_features.remove( best_split['feature'] )
+            
+            children = []    
             for value, child_dataset in best_split['datasets'].items():
-
-                if child_dataset.empty: # caso para aquele valor nao houver nenhuma sample
-                    subtree = Node(condition= value, leaf_value= self.calculate_leaf_value(y))
-
-                else: 
-                    subtree = self.build_tree(dataset= child_dataset, remaining_features= remaining_features, parent_dataset= dataset)
-                    subtree.set_condition(value) #o valor é a condição referente à feature do pai
+                subtree = self.build_tree(dataset= child_dataset, remaining_features= remaining_features, parent_dataset= dataset)
+                subtree.set_condition(value) #o valor é a condição referente à feature do pai
 
                 children.append(subtree)
                 
             return Node(feature= best_split['feature'], info_gain= best_split['info_gain'], children= children)
-        
-        return Node(leaf_value= self.calculate_leaf_value(y))     
+         
+    #Cálculo do info gain com entropia
+    def entropy_df(self, dataset: pd.DataFrame) -> float:
+        dataset = dataset[self.target]
+        # Handle potential empty DataFrames or attributes with no unique values
+        if len(dataset) == 0 or len(dataset.unique()) == 1:
+            return 0  # Entropy is 0 for empty datasets or single-valued attributes
+        # Vectorized implementation for efficiency using `groupby` and weighted entropy calculation
+        value_counts = dataset.value_counts(normalize=True)
+        entropy = -(value_counts * np.log2(value_counts)).sum()
+        return entropy
+    
+    def entropy_class(self, dataset: pd.DataFrame, feature: str) -> dict:
+        values_target = dataset[self.target].unique()
+        values_feature = dataset[feature].unique()
+        entropy_dic = {}
+        for val in values_feature:
+            soma = 0
+            for j in values_target:
+                tamanho_val_feature = dataset[dataset[feature]== val].shape[0]
+                    
+                a = dataset[(dataset[feature]== val) & (dataset[self.target] == j)].shape[0]
+                if a == 0:
+                    continue
+                else:
+                    prob = a/tamanho_val_feature
+                    soma +=  -(prob)*np.log2(prob)
+            entropy_dic[val] = soma
+        return entropy_dic
+    
+    def entropy_split(self, dataset: pd.DataFrame, feature: str) -> float:
+        dic = self.entropy_class(dataset, feature)
+        values = dic.keys()
+        soma = 0
+        tamanho = len(dataset[feature])
+        for i in values:
+            soma += (len(dataset[dataset[feature] == i])/tamanho) * dic[i]
+        return soma
+    
+    def info_gain(self, dataset: pd.DataFrame, feature: str) -> float:
+        return self.entropy_df(dataset) - self.entropy_split(dataset, feature)
+    
+    def max_info_gain(self, dataset: pd.DataFrame, features: list) -> tuple:
+        info_gains = [self.info_gain(dataset= dataset, feature= feature) for feature in features]
+        max_info_gain = max(info_gains)
+        return (features[ info_gains.index(max_info_gain) ], max_info_gain)
     
     #Cálculo de gini
     def gini_class(self, dataset: pd.DataFrame, feature: str) -> dict: # Calcula o indice gini de cada valor em uma feature e retorna um dicionario com cada valor e seu respectivo resultado
-        _, target = self.split_features_target(dataset)
-        values_target = dataset[target].unique()
+        values_target = dataset[self.target].unique()
         values_feature = dataset[feature].unique()
         gini_dic = {}
         for val in values_feature:
@@ -289,7 +324,7 @@ class DecisionTreeClassifier:
 
                 tamanho_val_feature = len(dataset[dataset[feature]== val])
                     
-                a = dataset[(dataset[feature]== val) & (dataset[target] == j)].shape[0]
+                a = dataset[(dataset[feature]== val) & (dataset[self.target] == j)].shape[0]
                 soma -= (a/tamanho_val_feature)**2
             gini_dic[val] = soma
         return gini_dic
@@ -308,40 +343,10 @@ class DecisionTreeClassifier:
         final_gini = min(ginis)
         return (features[ ginis.index(final_gini) ], final_gini)
     
-    #Cálculo ganho de informação
-    def b(self, q: float) -> float:
-        return -(q*np.log2(q) + (1-q)*np.log2(1-q)) if q not in {0, 1} else 0
-     
-    def remainder(self, dataset: pd.DataFrame, feature: str) -> float:
-        _, target = self.split_features_target(dataset)
-        class_counts = dataset[target].value_counts()
-        p = class_counts.get(1, 0) 
-        n = class_counts.get(0, 0) 
-        
-        possible_values = dataset[feature].unique()
-        r = 0
-        
-        for value in possible_values:
-            k_dataset = dataset[dataset[feature] == value]
-            k_class_counts = k_dataset[target].value_counts()
-            pk = k_class_counts.get(1, 0)  
-            nk = k_class_counts.get(0, 0) 
-            r += (pk + nk) / (p + n) * self.b(pk / (pk + nk))
-            
-        return r
-
-    def information_gain(self, dataset: pd.DataFrame, feature: str) -> float:
-        return 1 - self.remainder(dataset, feature)
-
-    def max_info_gain(self, dataset: pd.DataFrame) -> tuple: # (feature, info_gain)
-        features, _ = self.split_features_target(dataset)
-        info_gains = [self.information_gain(dataset, feature) for feature in features]
-        info_gain = max(info_gains)
-        return (features[ info_gains.index(info_gain) ], info_gain)
-
     #obtem o melhor split de dados
     def get_best_split(self, dataset: pd.DataFrame, features: list) -> dict: #dict com feature, info_gain e k: k_dataset
-        feature, gain = self.max_gini(dataset, features)
+        feature, info_gain = self.max_info_gain(dataset, features)
+        
         feature_values = self.original_dataset[feature].unique() #valores do original para haver sempre todos os ramos na arvore
 
         child_datasets = {}
@@ -351,7 +356,7 @@ class DecisionTreeClassifier:
             
         best_split = {}    
         best_split['feature'] = feature
-        best_split['info_gain'] = gain
+        best_split['info_gain'] = info_gain
         best_split['datasets'] = child_datasets
         return best_split
     
@@ -361,10 +366,9 @@ class DecisionTreeClassifier:
         return max(y, key= y.count)
     
     #construçao da DT
-    def fit(self, x: pd.DataFrame, y: pd.DataFrame) -> None: 
-        dataset = pd.concat((x,y), axis=1)
+    def fit(self, dataset: pd.DataFrame) -> None: 
         self.original_dataset = dataset
-        features = x.columns.to_list()
+        features, self.target = self.split_features_target(dataset= dataset)
         self.root = self.build_tree(dataset= dataset, remaining_features= features, parent_dataset= dataset)
         
     def predict(self, X: pd.DataFrame) -> list:
@@ -381,15 +385,14 @@ class DecisionTreeClassifier:
         print(x)
         print('No prediction')
 
-    def subsets(self, df, target):
-        return [np.random.choice(df[df[target] == i].index.values.tolist(), size=len(df[df[target] == i]), replace=False) for i in df[target].unique()]
+    def subsets(self, dataset: pd.DataFrame) -> list:
+        return [np.random.choice(dataset[dataset[self.target] == i].index.values.tolist(), size=len(dataset[dataset[self.target] == i]), replace=False) for i in dataset[self.target].unique()]
 
-    def stratify(self, df:pd.DataFrame, perc): # generalização do split representative working 
-        _, target = self.split_features_target(df)
-        sample_test = math.ceil(perc * df.shape[0])
-        values_prop = df[target].value_counts(normalize= True) * sample_test
+    def stratify(self, dataset: pd.DataFrame, perc: float): # generalização do split representative working 
+        sample_test = math.ceil(perc * dataset.shape[0])
+        values_prop = dataset[self.target].value_counts(normalize= True) * sample_test
         quantidade = values_prop.map(round)
-        values_sub = self.subsets(df, target)
+        values_sub = self.subsets(dataset)
         acc_test = []
         acc_train = []
         for i in range(len(quantidade)):
@@ -402,8 +405,8 @@ class DecisionTreeClassifier:
         acc_test = np.random.choice(list_test, size = len(list_test), replace=False)
         acc_test, exc = acc_test[:sample_test], acc_test[sample_test:]
         list_train.extend(exc)
-        test = df.iloc[acc_test]
-        train = df.iloc[list_train]
+        test = dataset.iloc[acc_test]
+        train = dataset.iloc[list_train]
 
         return train, test
         
@@ -420,8 +423,6 @@ class DecisionTreeClassifier:
             print(indent + "Condition: " + str(node.condition) + "|   Feature: " + node.feature)
         for child in node.children:
             self.print_tree(child, indent + "   ")
-
-
 
 def split_representative(df: pd.DataFrame, perc: float) -> float:
         _, target = DecisionTreeClassifier().split_features_target(df)
@@ -458,52 +459,6 @@ def precision(dataframe: pd.DataFrame) -> float:
             total += 1
     return positivos/total
 
-# print(precision(restaurant_df))
-
-def entropy_df(df) -> float:
-    _, target = DecisionTreeClassifier().split_features_target(df)
-    df = df[target]
-    # Handle potential empty DataFrames or attributes with no unique values
-    if len(df) == 0 or len(df.unique()) == 1:
-        return 0  # Entropy is 0 for empty datasets or single-valued attributes
-    # Vectorized implementation for efficiency using `groupby` and weighted entropy calculation
-    value_counts = df.value_counts(normalize=True)
-    entropy = -(value_counts * np.log2(value_counts)).sum()
-    return entropy
-
-def entropy_class(dataset: pd.DataFrame, feature):
-    _, target = DecisionTreeClassifier().split_features_target(dataset)
-    values_target = dataset[target].unique()
-    values_feature = dataset[feature].unique()
-    entropy_dic = {}
-    for val in values_feature:
-        soma = 0
-        for j in values_target:
-            tamanho_val_feature = dataset[dataset[feature]== val].shape[0]
-                
-            a = dataset[(dataset[feature]== val) & (dataset[target] == j)].shape[0]
-            if a == 0:
-                continue
-            else:
-                prob = a/tamanho_val_feature
-                soma +=  -(prob)*np.log2(prob)
-        entropy_dic[val] = soma
-    return entropy_dic
-
-def entropy_split(dataset, feature):
-        dic = entropy_class(dataset, feature)
-        values = dic.keys()
-        soma = 0
-        tamanho = len(dataset[feature])
-        for i in values:
-            soma += (len(dataset[dataset[feature] == i])/tamanho) * dic[i]
-        return soma
-
-def info_gain(dataset, feature):
-    return entropy_df(dataset) - entropy_split(dataset, feature)
-
-
-
 def point_split(df, attribute, extremos): # função para avaliar onde fazer a melhor divisao (para binario) em classes contínuas  not working 
     acc = []
     b = df[attribute]
@@ -520,8 +475,6 @@ def point_split(df, attribute, extremos): # função para avaliar onde fazer a m
     print(acc)
     return 
 
-
-
 def calc_entropy(feature_value_data, label, class_list):
     class_count = feature_value_data.shape[0]
     class_list, target = DecisionTreeClassifier.split_features_target()
@@ -535,3 +488,13 @@ def calc_entropy(feature_value_data, label, class_list):
             entropy_class = - probability_class * np.log2(probability_class)  #entropy
         entropy += entropy_class
     return entropy
+
+preProcess = PreprocessData(restaurant_df)
+preProcess.prepare_dataset(n_classes= 3, func= preProcess.eq_frequency)
+
+print(preProcess.dataset)
+print(preProcess.codification)
+
+dt = DecisionTreeClassifier()
+dt.fit(preProcess.dataset)
+dt.print_tree(dt.root)
