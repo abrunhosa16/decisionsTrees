@@ -285,9 +285,9 @@ class DecisionTreeClassifier:
         for val in values_feature:
             soma = 0
             for j in values_target:
-                tamanho_val_feature = dataset[dataset[feature]== val].shape[0]
+                tamanho_val_feature = dataset[dataset[feature]== val].shape[0] #nº de linhas do dataset com value
                     
-                a = dataset[(dataset[feature]== val) & (dataset[self.target] == j)].shape[0]
+                a = dataset[(dataset[feature]== val) & (dataset[self.target] == j)].shape[0] #nº de linhas do dataset com value e j
                 if a == 0:
                     continue
                 else:
@@ -306,7 +306,7 @@ class DecisionTreeClassifier:
         return soma
     
     def info_gain(self, dataset: pd.DataFrame, feature: str) -> float:
-        return self.entropy_df(dataset) - self.entropy_split(dataset, feature)
+        return 1 + (self.entropy_split(dataset, self.target) - self.entropy_split(dataset, feature))
     
     def max_info_gain(self, dataset: pd.DataFrame, features: list) -> tuple:
         info_gains = [self.info_gain(dataset= dataset, feature= feature) for feature in features]
@@ -385,14 +385,16 @@ class DecisionTreeClassifier:
         print(x)
         print('No prediction')
 
-    def subsets(self, dataset: pd.DataFrame) -> list:
-        return [np.random.choice(dataset[dataset[self.target] == i].index.values.tolist(), size=len(dataset[dataset[self.target] == i]), replace=False) for i in dataset[self.target].unique()]
+    def subsets(self, dataset: pd.DataFrame, target: str) -> list:
+        return [np.random.choice(dataset[dataset[target] == i].index.values.tolist(), size=len(dataset[dataset[target] == i]), replace=False) for i in dataset[target].unique()]
 
+    # mudar esta funçao para a classe de preprocessamento
     def stratify(self, dataset: pd.DataFrame, perc: float): # generalização do split representative working 
+        _, target = self.split_features_target(dataset= dataset)
         sample_test = math.ceil(perc * dataset.shape[0])
-        values_prop = dataset[self.target].value_counts(normalize= True) * sample_test
+        values_prop = dataset[target].value_counts(normalize= True) * sample_test
         quantidade = values_prop.map(round)
-        values_sub = self.subsets(dataset)
+        values_sub = self.subsets(dataset, target)
         acc_test = []
         acc_train = []
         for i in range(len(quantidade)):
@@ -409,6 +411,72 @@ class DecisionTreeClassifier:
         train = dataset.iloc[list_train]
 
         return train, test
+    
+    #funçoes para PRECISION, ACCURACY, RECALL
+    def evaluate_binary(self, y_test: list, y_pred: list) -> None:
+        positive_label = 1
+        negative_label = 0
+        TP = 0
+        TN = 0
+        FP = 0
+        FN = 0
+
+        for idx, pred in enumerate(y_pred):
+            if pred == positive_label:
+                if y_test[ idx ] == positive_label:
+                    TP += 1
+                if y_test[ idx ] == negative_label:
+                    FP += 1
+            elif pred == negative_label:
+                if y_test[ idx ] == negative_label:
+                    TN += 1
+                elif y_test[ idx ] == positive_label:
+                    FN += 1
+        print('Precision: ' + str(TP / (TP + FP)))
+        print('Accuracy: ' + str( (TP + TN) /(TP + TN + FP + FN)))
+        print('Recall: ' + str(TP / (TP + FN)))
+    
+    def evaluate_non_binary(self, y_test: list, y_pred: list) -> None: #vi no site https://www.evidentlyai.com/classification-metrics/multi-class-metrics
+        pred_values = set(y_pred)
+        
+        TP = 0
+        FP = 0
+        TN = 0
+        FN = 0
+        recall = 0
+        precision = 0
+        accuracy = 0
+        
+        for value in pred_values:
+            TP = 0
+            FP = 0
+            TN = 0
+            FN = 0
+            for idx, pred in enumerate(y_pred):
+                if pred == value:
+                    if y_test[ idx ] == value: TP += 1
+                    else: FP += 1
+                else:
+                    if y_test[ idx ] == value: FN += 1
+            recall += TP / (TP + FN)
+            precision += TP / (TP + FP)
+            accuracy += (TP + TN) / (TP + TN + FP + FN)
+        print('Precision: ' + str(precision / len(pred_values)))
+        print('Recall: ' + str(recall / len(pred_values)))
+        print('Accuracy: ' + str(accuracy / len(pred_values)))
+    
+    def evaluate(self, test_dataset: pd.DataFrame) -> None:
+        x_test = test_dataset[ test_dataset.columns[:-1] ]
+        y_test = test_dataset[ self.target ].to_list()
+        y_pred = self.predict(x_test)
+        
+        print('Test values: ' + str(y_test))
+        print('Pred values: ' + str(y_pred))
+        
+        if len(self.original_dataset[self.target].values) == 2:
+            self.evaluate_binary(y_test= y_test, y_pred= y_pred)
+        else:
+            self.evaluate_non_binary(y_test= y_test, y_pred= y_pred)
         
     def print_tree(self, node: Node= None, indent= ""):
         if node is None:
@@ -446,12 +514,10 @@ def precision(dataframe: pd.DataFrame) -> float:
         classifier = DecisionTreeClassifier()
 
         train_df, test_df = classifier.stratify(dataframe, 0.2)
-        x_train = train_df.iloc[:, :-1]
-        y_train = train_df.iloc[:, -1]
 
         x_test = test_df.iloc[:, :-1]
         y_test = test_df.iloc[:, -1].tolist()
-        classifier.fit(x_train, y_train)
+        classifier.fit(train_df)
         y_pred = classifier.predict(x_test)
         for j in range(len(y_pred)):
             if y_pred[j] == y_test[j]:
@@ -489,12 +555,12 @@ def calc_entropy(feature_value_data, label, class_list):
         entropy += entropy_class
     return entropy
 
-preProcess = PreprocessData(restaurant_df)
+preProcess = PreprocessData(weather_df)
 preProcess.prepare_dataset(n_classes= 3, func= preProcess.eq_frequency)
-
-print(preProcess.dataset)
-print(preProcess.codification)
-
 dt = DecisionTreeClassifier()
-dt.fit(preProcess.dataset)
-dt.print_tree(dt.root)
+train_df, test_df = dt.stratify(preProcess.dataset, 0.2)
+dt.fit(train_df)
+dt.evaluate(test_dataset= test_df)
+
+# for feature in preProcess.dataset.columns[:-1]:
+#     print(dt.info_gain(dt.original_dataset, feature))
