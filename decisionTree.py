@@ -16,7 +16,10 @@ class PreprocessData:
         self.dataset = dataset.copy()
         self.codification = {}
         self.continuous_features = []
-        self.categoric_features = []            
+        self.categoric_features = []    
+        self.target = self.dataset.columns[-1]
+        self.train = None
+        self.test = None
 
     #Cat to numeric
     def to_numeric(self, feature: str) -> None:
@@ -154,9 +157,36 @@ class PreprocessData:
         self.codification[feature] = ['k_means', feature_dic]
         self.dataset = X
     
+    #divide em treino e teste
+    def subsets(self, target: str) -> list:
+        return [np.random.choice(self.dataset[self.dataset[target] == i].index.values.tolist(), size=len(self.dataset[self.dataset[target] == i]), replace=False) for i in self.dataset[target].unique()]
+
+    def stratify(self, perc: float) -> None: 
+        sample_test = math.ceil(perc * self.dataset.shape[0]) #calcula tamanho do test_df
+
+        values_prop = self.dataset[self.target].value_counts(normalize= True) * sample_test 
+        quantidade = values_prop.map(round) #nº de valores do target presente no test_df para manter proporçao
+        
+        values_sub = self.subsets(self.target)
+        #listas para guardar indices dos valores de teste e treino
+        acc_test = [] 
+        acc_train = []
+        for i in range(len(quantidade)):
+            quant = quantidade[i]
+            acc_test.append(values_sub[i][:quant])
+            acc_train.append(values_sub[i][quant : ])
+            
+        #listas com os indices
+        list_test = list(itertools.chain.from_iterable(acc_test))
+        list_train = list(itertools.chain.from_iterable(acc_train))
+        acc_test = np.random.choice(list_test, size = len(list_test), replace=False)
+        acc_test, exc = acc_test[:sample_test], acc_test[sample_test:]
+        list_train.extend(exc)
+        self.test = self.dataset.iloc[acc_test]
+        self.train = self.dataset.iloc[list_train]
+    
     #prepara o dataset para a arvore
     def prepare_dataset(self, n_classes: int= 3, func= None) -> None:
-        self.target = self.dataset.columns[-1]
         if 'ID' not in self.dataset.columns:
             self.dataset['ID'] = self.dataset.index + 1
         self.to_numeric(self.target)
@@ -385,33 +415,6 @@ class DecisionTreeClassifier:
         print(x)
         print('No prediction')
 
-    def subsets(self, dataset: pd.DataFrame, target: str) -> list:
-        return [np.random.choice(dataset[dataset[target] == i].index.values.tolist(), size=len(dataset[dataset[target] == i]), replace=False) for i in dataset[target].unique()]
-
-    # mudar esta funçao para a classe de preprocessamento
-    def stratify(self, dataset: pd.DataFrame, perc: float): # generalização do split representative working 
-        _, target = self.split_features_target(dataset= dataset)
-        sample_test = math.ceil(perc * dataset.shape[0])
-        values_prop = dataset[target].value_counts(normalize= True) * sample_test
-        quantidade = values_prop.map(round)
-        values_sub = self.subsets(dataset, target)
-        acc_test = []
-        acc_train = []
-        for i in range(len(quantidade)):
-            quant = quantidade[i]
-            acc_test.append(values_sub[i][:quant])
-            acc_train.append(values_sub[i][quant : ])
-
-        list_test = list(itertools.chain.from_iterable(acc_test))
-        list_train = list(itertools.chain.from_iterable(acc_train))
-        acc_test = np.random.choice(list_test, size = len(list_test), replace=False)
-        acc_test, exc = acc_test[:sample_test], acc_test[sample_test:]
-        list_train.extend(exc)
-        test = dataset.iloc[acc_test]
-        train = dataset.iloc[list_train]
-
-        return train, test
-    
     #funçoes para PRECISION, ACCURACY, RECALL
     def evaluate_binary(self, y_test: list, y_pred: list) -> None:
         positive_label = 1
@@ -555,12 +558,31 @@ def calc_entropy(feature_value_data, label, class_list):
         entropy += entropy_class
     return entropy
 
-preProcess = PreprocessData(weather_df)
-preProcess.prepare_dataset(n_classes= 3, func= preProcess.eq_frequency)
-dt = DecisionTreeClassifier()
-train_df, test_df = dt.stratify(preProcess.dataset, 0.2)
-dt.fit(train_df)
-dt.evaluate(test_dataset= test_df)
+def run(dataset: int, n_classes: int, f: int):
+    datasets = [restaurant_df, weather_df, iris_df]
+    dataset = datasets[dataset - 1]
+    process = PreprocessData(dataset= dataset)
+    funcs = [process.eq_frequency, process.eq_interval_width, process.k_means]
+    f = funcs[f - 1]
+    process.prepare_dataset(n_classes= n_classes, func= f)
+    process.stratify(0.2)
+    print(process.train)
+    dt = DecisionTreeClassifier()
+    dt.fit(dataset= process.dataset)
+    dt.print_tree()
+    print('Train:')
+    dt.evaluate(process.train)
+    print('Test:')
+    dt.evaluate(process.test)
+    
+# preProcess = PreprocessData(restaurant_df)
+# preProcess.prepare_dataset(n_classes= 3, func= preProcess.eq_frequency)
+# train, test = preProcess.stratify(0.2)
+# dt = DecisionTreeClassifier()
+# train_df, test_df = dt.stratify(preProcess.dataset, 0.2)
+# dt.fit(preProcess.dataset)
+# dt.print_tree()
+# dt.evaluate(test_dataset= test_df)
 
 # for feature in preProcess.dataset.columns[:-1]:
 #     print(dt.info_gain(dt.original_dataset, feature))
