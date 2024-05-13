@@ -308,22 +308,20 @@ class DecisionTreeClassifier:
         entropy = -(value_counts * np.log2(value_counts)).sum()
         return entropy
     
-    def entropy_class(self, dataset: pd.DataFrame, feature: str) -> dict:
-        values_target = dataset[self.target].unique()
+    def entropy_class(self, dataset: pd.DataFrame, feature: str, target: str) -> dict:
+        values_target = dataset[target].unique()
         values_feature = dataset[feature].unique()
         entropy_dic = {}
+        
         for val in values_feature:
-            soma = 0
+            entropy_val = 0
             for j in values_target:
-                tamanho_val_feature = dataset[dataset[feature]== val].shape[0] #nº de linhas do dataset com value
-                    
-                a = dataset[(dataset[feature]== val) & (dataset[self.target] == j)].shape[0] #nº de linhas do dataset com value e j
-                if a == 0:
-                    continue
-                else:
-                    prob = a/tamanho_val_feature
-                    soma +=  -(prob)*np.log2(prob)
-            entropy_dic[val] = soma
+                subset = dataset[(dataset[feature] == val) & (dataset[target] == j)]
+                prob = len(subset) / len(dataset[dataset[feature] == val])
+                if prob > 0:
+                    entropy_val -= prob * np.log2(prob)
+            entropy_dic[val] = entropy_val
+        
         return entropy_dic
     
     def entropy_split(self, dataset: pd.DataFrame, feature: str) -> float:
@@ -336,7 +334,7 @@ class DecisionTreeClassifier:
         return soma
     
     def info_gain(self, dataset: pd.DataFrame, feature: str) -> float:
-        return 1 + (self.entropy_split(dataset, self.target) - self.entropy_split(dataset, feature))
+        return self.entropy_df(dataset) - self.entropy_split(dataset, feature)
     
     def max_info_gain(self, dataset: pd.DataFrame, features: list) -> tuple:
         info_gains = [self.info_gain(dataset= dataset, feature= feature) for feature in features]
@@ -495,20 +493,6 @@ class DecisionTreeClassifier:
         for child in node.children:
             self.print_tree(child, indent + "   ")
 
-def split_representative(df: pd.DataFrame, perc: float) -> float:
-        _, target = DecisionTreeClassifier().split_features_target(df)
-        yes_per, _ = df[target].value_counts(normalize=True) # proporção de sims e naos
-        yes_sub, no_sub = DecisionTreeClassifier().subsets(df, target)[0],  DecisionTreeClassifier().subsets(df, target)[1] # o subconjunto de sins e naos representados pelo ID
-        # Embaralhar os indices de sins e naos
-        total_yes, total_no = np.random.choice(yes_sub, size=len(yes_sub), replace=False), np.random.choice(no_sub, size=len(no_sub), replace=False)
-        num_train = math.ceil(perc * df.shape[0])
-        num_yes = math.ceil(num_train * yes_per) # calcula o valor a ser removido para teste 
-        num_no = num_train - num_yes # calcula o valor a ser removido para teste 
-        test = df.iloc[[*total_yes[:num_yes],*total_no[:num_no]]] # indices para teste
-        train = df.iloc[[*total_yes[num_yes:], *total_no[num_no:]]] # indices para treino 
-
-        return train, test
-
 def precision(dataframe: pd.DataFrame) -> float:
     positivos = 0
     total = 0
@@ -528,21 +512,6 @@ def precision(dataframe: pd.DataFrame) -> float:
             total += 1
     return positivos/total
 
-def point_split(df, attribute, extremos): # função para avaliar onde fazer a melhor divisao (para binario) em classes contínuas  not working 
-    acc = []
-    b = df[attribute]
-    minorante, majorante = extremos
-    num_min, num_max = df[attribute].min(), df[attribute].max()
-    ran = num_max - num_min
-    ran = int(ran/2)
-    for i in range(ran):
-        a = pd.cut(b, bins=[minorante, num_min + i, num_max - i, majorante + 1], labels=[0,1, 2])
-        #print(a)
-    #minimo = min(acc)
-    m, n = acc.index(max(acc)) + num_min, num_max - acc.index(max(acc))
-    print(m,n)
-    print(acc)
-    return 
 
 def calc_entropy(feature_value_data, label, class_list):
     class_count = feature_value_data.shape[0]
