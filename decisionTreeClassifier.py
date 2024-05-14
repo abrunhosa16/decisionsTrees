@@ -1,5 +1,6 @@
 from node import Node
-import pandas as pd, numpy as np 
+import pandas as pd, numpy as np, matplotlib.pyplot as plt, networkx as nx, matplotlib
+from preProcess import PreprocessData
 
 
 class DecisionTreeClassifier:
@@ -140,10 +141,10 @@ class DecisionTreeClassifier:
         return max(y, key= y.count)
     
     #construçao da DT
-    def fit(self, dataset: pd.DataFrame) -> None: 
-        self.original_dataset = dataset
-        features, self.target = self.split_features_target(dataset= dataset)
-        self.root = self.build_tree(dataset= dataset, remaining_features= features, parent_dataset= dataset)
+    def fit(self, process: PreprocessData) -> None: 
+        self.original_dataset = process.dataset
+        features, self.target = self.split_features_target(dataset= self.original_dataset)
+        self.root = self.build_tree(dataset= process.train, remaining_features= features, parent_dataset= process.train)
         
     def predict(self, X: pd.DataFrame) -> list:
         predictions = [self.make_prediction(row, self.root) for _, row in X.iterrows()]
@@ -174,3 +175,4 @@ class DecisionTreeClassifier:
             print(indent + "Condition: " + str(node.condition) + "|   Feature: " + node.feature)
         for child in node.children:
             self.print_tree(child, indent + "   ")
+            
