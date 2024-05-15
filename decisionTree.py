@@ -26,12 +26,8 @@ def run(dataset: int, n_classes: int, f: int):
     process.stratify(0.2)
     print(process.train)
     dt = DecisionTreeClassifier()
-    dt.fit(dataset= process.dataset)
+    dt.fit(process)
     dt.print_tree()
-    print('Train:')
-    dt.evaluate(process.train)
-    print('Test:')
-    dt.evaluate(process.test)
     
 # preProcess = PreprocessData(restaurant_df)
 # preProcess.prepare_dataset(n_classes= 3, func= preProcess.eq_frequency)
