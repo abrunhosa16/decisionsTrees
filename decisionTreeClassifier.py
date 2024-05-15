@@ -1,4 +1,4 @@
-from node import Node
+from nodeD import Node
 import pandas as pd, numpy as np, matplotlib.pyplot as plt, networkx as nx, matplotlib
 from preProcess import PreprocessData
 
