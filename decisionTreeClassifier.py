@@ -1,16 +1,11 @@
-from nodeD import Node
-import pandas as pd, numpy as np, matplotlib.pyplot as plt, networkx as nx, matplotlib
-from preProcess import PreprocessData
-
+from node import Node
+import pandas as pd, numpy as np
 
 class DecisionTreeClassifier:
     def __init__(self) -> None:
         self.root = None
         self.target = None
-    
-    #retorna features e target
-    def split_features_target(self, dataset: pd.DataFrame) -> list:
-        return dataset.columns.to_list()[:-1], dataset.columns[-1]
+        self.gain = None
         
     #avalia se todos os valores do target são iguais
     def same_class(self, dataset: pd.DataFrame) -> bool:
@@ -47,9 +42,8 @@ class DecisionTreeClassifier:
     #Cálculo do info gain com entropia
     def entropy_df(self, dataset: pd.DataFrame) -> float:
         dataset = dataset[self.target]
-        # Handle potential empty DataFrames or attributes with no unique values
-        if len(dataset) == 0 or len(dataset.unique()) == 1:
-            return 0  # Entropy is 0 for empty datasets or single-valued attributes
+        if len(dataset) == 0 or len(dataset.unique()) == 1: #Caso o dataset seja vazio ou com valor unico
+            return 0
         # Vectorized implementation for efficiency using `groupby` and weighted entropy calculation
         value_counts = dataset.value_counts(normalize=True)
         entropy = -(value_counts * np.log2(value_counts)).sum()
@@ -83,6 +77,7 @@ class DecisionTreeClassifier:
     def info_gain(self, dataset: pd.DataFrame, feature: str) -> float:
         return self.entropy_df(dataset) - self.entropy_split(dataset, feature)
     
+    #TEMOS GANHOS >1 (?)
     def max_info_gain(self, dataset: pd.DataFrame, features: list) -> tuple:
         info_gains = [self.info_gain(dataset= dataset, feature= feature) for feature in features]
         max_info_gain = max(info_gains)
@@ -120,7 +115,7 @@ class DecisionTreeClassifier:
     
     #obtem o melhor split de dados
     def get_best_split(self, dataset: pd.DataFrame, features: list) -> dict: #dict com feature, info_gain e k: k_dataset
-        feature, info_gain = self.max_info_gain(dataset, features)
+        feature, info_gain = self.gain(dataset, features)
         
         feature_values = self.original_dataset[feature].unique() #valores do original para haver sempre todos os ramos na arvore
 
@@ -129,7 +124,7 @@ class DecisionTreeClassifier:
             child_dataset = dataset[dataset[feature] == value]
             child_datasets[value] = child_dataset
             
-        best_split = {}    
+        best_split = {}
         best_split['feature'] = feature
         best_split['info_gain'] = info_gain
         best_split['datasets'] = child_datasets
@@ -141,27 +136,25 @@ class DecisionTreeClassifier:
         return max(y, key= y.count)
     
     #construçao da DT
-    def fit(self, process: PreprocessData) -> None: 
-        self.original_dataset = process.dataset
-        features, self.target = self.split_features_target(dataset= self.original_dataset)
-        self.root = self.build_tree(dataset= process.train, remaining_features= features, parent_dataset= process.train)
+    def fit(self, dataset: pd.DataFrame, option) -> None: #option é self.max_info_gain ou self.max_gini
+        self.gain = option
+        self.original_dataset = dataset
+        features, self.target = dataset.columns.to_list()[:-1], dataset.columns[-1]
+        self.root = self.build_tree(dataset= dataset, remaining_features= features, parent_dataset= dataset)
         
     def predict(self, X: pd.DataFrame) -> list:
-        predictions = [self.make_prediction(row, self.root) for _, row in X.iterrows()]
-        return predictions
+        return [self.make_prediction(row, self.root) for _, row in X.iterrows()]
     
-    def make_prediction(self, x: pd.Series, tree: Node) -> int:
-        if tree.is_leaf(): 
-            return tree.leaf_value
-        feature_value = x[tree.feature]
-        for child in tree.children:
+    def make_prediction(self, x: pd.Series, node: Node) -> int:
+        if node.is_leaf(): 
+            return node.leaf_value
+        feature_value = x[node.feature]
+        for child in node.children:
             if feature_value == child.condition:
                 return self.make_prediction(x, child)
-        print(x)
-        print('No prediction')
+        # print(x)
+        # print('No prediction')
 
-    
-        
     def print_tree(self, node: Node= None, indent= ""):
         if node is None:
             node = self.root

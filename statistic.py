@@ -7,14 +7,11 @@ weather_df = pd.read_csv('datasets/weather.csv')
 iris_df = pd.read_csv('datasets/iris.csv')
 
 class Statistics:
-    def __init__(self, tree: DecisionTreeClassifier, process: PreprocessData):
-        self.tree = tree
-        self.process = process
-        self.target = self.tree.target
-     
-
+    def __init__(self) -> None:
+        pass
+    
     #funçoes para PRECISION, ACCURACY, RECALL
-    def evaluate_binary(self, y_test, y_pred) -> None:
+    def evaluate_binary(self, y_test, y_pred) -> tuple:
         positive_label = 1
         negative_label = 0
         TP = 0
@@ -40,13 +37,9 @@ class Statistics:
         accuracy = (TP + TN) /(TP + TN + FP + FN)
         recall = TP / (TP + FN) if TP + FN > 0 else 0
         f1_score = (2 * precision * recall)/(precision + recall) if precision + recall > 0 else 0
-        print('Precision: ' + str(precision))
-        print('Recall: ' + str(recall))
-        print('Accuracy: ' + str(accuracy))
-        print('F1 Score: ' + str(f1_score))
-        print('Confusion Matrix: \n ' + str(TP) + '|' + str(FN) + '\n -+-\n ' + str(FP) + '|' + str(TN))
+        return precision, recall, accuracy, f1_score, str(TP) + '|' + str(FN) + '\n -+-\n ' + str(FP) + '|' + str(TN)
     
-    def evaluate_non_binary(self, y_test: list, y_pred: list) -> None: #vi no site https://www.evidentlyai.com/classification-metrics/multi-class-metrics
+    def evaluate_non_binary(self, y_test: list, y_pred: list) -> tuple: #vi no site https://www.evidentlyai.com/classification-metrics/multi-class-metrics
         pred_values = set(y_pred)
         
         TP = 0
@@ -71,18 +64,65 @@ class Statistics:
             recall += TP / (TP + FN) if TP + FN > 0 else 0
             precision += TP / (TP + FP) if TP + FP > 0 else 0
             accuracy += (TP + TN) / (TP + TN + FP + FN)
-        print('Precision: ' + str(precision / len(pred_values)))
-        print('Recall: ' + str(recall / len(pred_values)))
-        print('Accuracy: ' + str(accuracy / len(pred_values)))
+        return precision / len(pred_values), recall / len(pred_values), accuracy / len(pred_values)
     
-    def evaluate(self, test_dataset: pd.DataFrame) -> None:
-        x_test = test_dataset[ test_dataset.columns[:-1] ]
-        y_test = test_dataset[ self.target ].to_list()
-        y_pred = self.tree.predict(x_test)
+    def evaluate_once(self, tree: DecisionTreeClassifier, process: PreprocessData) -> None:
+        test = process.test
+        target = process.target
+        x_test = test[ test.columns[:-1] ]
+        y_test = test[ target ].to_list()
+        y_pred = tree.predict(x_test)
         
         print('Test values: ' + str(y_test))
         print('Pred values: ' + str(y_pred))
-        if len( set(self.process.dataset[self.target].values) ) == 2:
-            self.evaluate_binary(y_test= y_test, y_pred= y_pred)
+        
+        if len( set(process.dataset[ target ].values) ) == 2:
+            precision, recall, accuracy, f1_score, confusion_matrix= self.evaluate_binary(y_test= y_test, y_pred= y_pred)
+            print('Precision: ' + str(precision))
+            print('Recall: ' + str(recall))
+            print('Accuracy: ' + str(accuracy))
+            print('F1 Score: ' + str(f1_score))
+            print('Confusion Matrix: \n ' + confusion_matrix)
+            
         else:
-            self.evaluate_non_binary(y_test= y_test, y_pred= y_pred)
+            precision, recall, accuracy = self.evaluate_non_binary(y_test= y_test, y_pred= y_pred)
+            print('Precision: ' + str(precision))
+            print('Recall: ' + str(recall))
+            print('Accuracy: ' + str(accuracy))
+            
+    def evaluate_n_times(self, dataset: int, n: int, n_classes: int, f: int, gain: int):
+        precisions = []
+        recalls = []
+        accuracies = []
+        for _ in range(n):
+            datasets = [restaurant_df, weather_df, iris_df]
+
+            process = PreprocessData(dataset= datasets[dataset - 1])
+            funcs = [process.eq_frequency, process.eq_interval_width]
+            process.prepare_dataset(n_classes= n_classes, func= funcs[f - 1])
+            process.stratify(0.2)
+
+            dt = DecisionTreeClassifier()
+            gains = [dt.max_info_gain, dt.max_gini]
+            dt.fit(dataset= process.train, option= gains[ gain - 1 ])
+            
+            test = process.test
+            target = process.target
+            x_test = test[ test.columns[:-1] ]
+            y_test = test[ target ].to_list()
+            y_pred = dt.predict(x_test)
+            
+            if len( set(process.dataset[ target ].values) ) == 2:
+                precision, recall, accuracy, *_ = self.evaluate_binary(y_test= y_test, y_pred= y_pred)
+            else:
+                precision, recall, accuracy = self.evaluate_non_binary(y_test= y_test, y_pred= y_pred)
+            
+            precisions.append(precision)
+            recalls.append(recall)
+            accuracies.append(accuracy)
+            
+        stats = pd.DataFrame({'precision': precisions,
+                              'recall': recalls,
+                              'accuracy': accuracies
+                              })
+        return stats.mean()

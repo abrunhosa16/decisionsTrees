@@ -5,7 +5,7 @@ class PreprocessData:
         self.dataset = dataset.copy()
         self.codification = {}
         self.continuous_features = []
-        self.categoric_features = []    
+        self.categoric_features = []
         self.target = self.dataset.columns[-1]
         self.train = None
         self.test = None
@@ -80,71 +80,6 @@ class PreprocessData:
                 feature_dic[ idx ] = [split_values[idx - 1], split_value]
         
         self.codification[ feature ] = ['eq_interval_width', feature_dic]
-
-    def k_means(self, K: int, feature: str) -> None: #mudar a classe target
-        centroids = self.dataset.sample(n = K) #escolhe k pontos random do dataset
-        
-        mask = self.dataset['ID'].isin(centroids.ID.tolist()) 
-        X = self.dataset
-        
-        diff = 1 #variavel para verificar quando os centroids param de  ser mudados
-        j = 0 #variavel controlar se é a primeira vez no ciclo
-        
-        XD = X
-        while(diff!=0):
-            i = 1 
-        
-            for _, row_centroid in centroids.iterrows(): #itera cada centroid
-                
-                ED=[] #lista para a distancia entre cada ponto e o centroid em causa
-            
-                for _, row_sample in XD.iterrows(): #itera cada sample \ centroids
-                    d1=( row_centroid[feature] - row_sample[feature] ) ** 2
-                    d2=( row_centroid[self.target] - row_sample[self.target] ) ** 2
-                    
-                    d=np.sqrt(d1+d2) #distancia centroid e sample
-                    ED.append(d)
-                    
-                X.loc[:, i] = ED #associa-se a cada sample a distancia entre o centroid e ela
-                i += 1
-
-            C=[]
-            for _, row in X.iterrows(): #itera cada sample
-    
-                min_dist = (None, float('inf'))
-                
-                for i in range(1, K + 1): #passa se por K centroids
-                    
-                    if row[i] < min_dist[1]: #verificar qual a dist minima entre sample e centroid
-                        min_dist = (i, row[i])
-                        
-                C.append(min_dist[0]) #guarda se o centroid mais perto daquela sample
-                
-            X.loc[:, feature + '_discrete'] = C #clustering
-            
-            centroids_new = X.groupby([feature + '_discrete']).mean()[[self.target,feature]] #calcular novos centroids fazendo a média da dist de sample e centroid
-            
-            if j == 0:
-                diff = 1
-                j += 1
-                
-            else:
-                diff = (centroids_new[self.target] - centroids[self.target]).sum() + (centroids_new[feature] - centroids[feature]).sum() #se os novos centroides forem igual aos antigos, diff==0 e acaba
-                
-            centroids = X.groupby([feature + '_discrete']).mean()[[self.target,feature]] #update centroids
-            centroids[feature + '_discrete'] = centroids.index
-            
-        centroids = centroids.drop(self.target, axis=1)
-        X = X.drop(feature, axis= 1)
-        X = X.drop([i for i in range(1, K+1)], axis= 1)
-
-        feature_dic = {}
-        
-        for cluster, row in centroids.iterrows():
-            feature_dic[ cluster ] = row[feature]
-
-        self.codification[feature] = ['k_means', feature_dic]
-        self.dataset = X
     
     #divide em treino e teste
     def subsets(self, target: str) -> list:
@@ -176,18 +111,17 @@ class PreprocessData:
     
     #prepara o dataset para a arvore
     def prepare_dataset(self, n_classes: int= 3, func= None) -> None:
-        if 'ID' not in self.dataset.columns:
-            self.dataset['ID'] = self.dataset.index + 1
-        self.to_numeric(self.target)
-        for feature in self.dataset.columns[:-1]:
-            if (self.dataset[feature].dtype == float or self.dataset[feature].dtype == 'int64') and feature != 'ID':
+        if 'ID' in self.dataset.columns:
+            self.dataset = self.dataset.drop('ID', axis= 1)
+        # self.to_numeric(self.target)
+        for feature in self.dataset.columns:
+            if self.dataset[feature].dtype == float or self.dataset[feature].dtype == 'int64': #cont
                 self.continuous_features.append(feature)
                 func(n_classes, feature)
 
-            elif self.dataset[feature].dtype == object or self.dataset[feature].dtype == bool:
+            elif self.dataset[feature].dtype == object or self.dataset[feature].dtype == bool: #cat
                 self.categoric_features.append(feature)
                 self.to_numeric(feature= feature)
-        self.dataset = self.dataset.drop('ID', axis= 1)
 
     #prepara uma linha para ser usada na previsão
     def prepare_row(self, row: pd.Series):
@@ -197,25 +131,77 @@ class PreprocessData:
             if feature in self.continuous_features:
                 type_cod, dic = self.codification[feature]
 
-                if type_cod == 'k_means': #se o tipo de codificaçao usada for k_means
-
-                    min_dist = [-1, float('inf')]
-                    
-                    for cls, centroid in dic.items():
-                        dist = abs(value - centroid) #distancia do ponto ao centroid
-                        if dist < min_dist[1]:
-                            min_dist = [cls, dist]
-
-                    new_row.append( min_dist[0] )
-                    
-                else:
-
-                    for cls, interval in dic.items():
-                        if value > interval[0] and value <= interval[1]:
-                            new_row.append( cls )
-                            break
+                for cls, interval in dic.items():
+                    if value > interval[0] and value <= interval[1]:
+                        new_row.append( cls )
+                        break
             
             elif feature in self.categoric_features:
                 dic = self.codification[feature]
                 new_row.append( dic.get(value) )
         return new_row
+    
+    # def k_means(self, K: int, feature: str) -> None: #mudar a classe target
+    #     centroids = self.dataset.sample(n = K) #escolhe k pontos random do dataset
+        
+    #     mask = self.dataset['ID'].isin(centroids.ID.tolist()) 
+    #     X = self.dataset
+        
+    #     diff = 1 #variavel para verificar quando os centroids param de  ser mudados
+    #     j = 0 #variavel controlar se é a primeira vez no ciclo
+        
+    #     XD = X
+    #     while(diff!=0):
+    #         i = 1 
+        
+    #         for _, row_centroid in centroids.iterrows(): #itera cada centroid
+                
+    #             ED=[] #lista para a distancia entre cada ponto e o centroid em causa
+            
+    #             for _, row_sample in XD.iterrows(): #itera cada sample \ centroids
+    #                 d1=( row_centroid[feature] - row_sample[feature] ) ** 2
+    #                 d2=( row_centroid[self.target] - row_sample[self.target] ) ** 2
+                    
+    #                 d=np.sqrt(d1+d2) #distancia centroid e sample
+    #                 ED.append(d)
+                    
+    #             X.loc[:, i] = ED #associa-se a cada sample a distancia entre o centroid e ela
+    #             i += 1
+
+    #         C=[]
+    #         for _, row in X.iterrows(): #itera cada sample
+    
+    #             min_dist = (None, float('inf'))
+                
+    #             for i in range(1, K + 1): #passa se por K centroids
+                    
+    #                 if row[i] < min_dist[1]: #verificar qual a dist minima entre sample e centroid
+    #                     min_dist = (i, row[i])
+                        
+    #             C.append(min_dist[0]) #guarda se o centroid mais perto daquela sample
+                
+    #         X.loc[:, feature + '_discrete'] = C #clustering
+            
+    #         centroids_new = X.groupby([feature + '_discrete']).mean()[[self.target,feature]] #calcular novos centroids fazendo a média da dist de sample e centroid
+            
+    #         if j == 0:
+    #             diff = 1
+    #             j += 1
+                
+    #         else:
+    #             diff = (centroids_new[self.target] - centroids[self.target]).sum() + (centroids_new[feature] - centroids[feature]).sum() #se os novos centroides forem igual aos antigos, diff==0 e acaba
+                
+    #         centroids = X.groupby([feature + '_discrete']).mean()[[self.target,feature]] #update centroids
+    #         centroids[feature + '_discrete'] = centroids.index
+            
+    #     centroids = centroids.drop(self.target, axis=1)
+    #     X = X.drop(feature, axis= 1)
+    #     X = X.drop([i for i in range(1, K+1)], axis= 1)
+
+    #     feature_dic = {}
+        
+    #     for cluster, row in centroids.iterrows():
+    #         feature_dic[ cluster ] = row[feature]
+
+    #     self.codification[feature] = ['k_means', feature_dic]
+    #     self.dataset = X
