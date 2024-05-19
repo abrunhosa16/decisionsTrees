@@ -39,7 +39,7 @@ class Statistics:
         f1_score = (2 * precision * recall)/(precision + recall) if precision + recall > 0 else 0
         return precision, recall, accuracy, f1_score, str(TP) + '|' + str(FN) + '\n -+-\n ' + str(FP) + '|' + str(TN)
     
-    def evaluate_non_binary(self, y_test: list, y_pred: list) -> tuple: #vi no site https://www.evidentlyai.com/classification-metrics/multi-class-metrics
+    def evaluate_non_binary(self, y_test: list, y_pred: list) -> tuple:
         pred_values = set(y_pred)
         
         TP = 0

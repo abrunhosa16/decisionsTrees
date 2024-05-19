@@ -1,20 +1,5 @@
-import pandas as pd
-import numpy as np
-import math
-import itertools
-import matplotlib
-import matplotlib.pyplot as plt
-import networkx as nx
-import graphviz
-from decisionTreeClassifier import DecisionTreeClassifier
-from preProcess import PreprocessData
-from statistic import Statistics
 from node import Node
 import graphviz
-
-restaurant_df = pd.read_csv('datasets/restaurant.csv')
-weather_df = pd.read_csv('datasets/weather.csv')
-iris_df = pd.read_csv('datasets/iris.csv')
 
 def visualize_tree(tree: Node, target_name: str, label_names):
     leaf_names = label_names[target_name]
@@ -57,19 +42,3 @@ def visualize_tree(tree: Node, target_name: str, label_names):
     dot = graphviz.Digraph()
     traverse(tree, dot)
     return dot
-
-process = PreprocessData(dataset=restaurant_df)
-process.prepare_dataset(n_classes=3, func=process.eq_interval_width)
-process.stratify(0.2)
-names = process.codification
-print(names)
-
-dt = DecisionTreeClassifier()
-dt.target = 'Class'
-dt.fit(dataset=process.dataset, option=dt.max_info_gain)
-dt.print_tree()
-
-dot = visualize_tree(dt.root, 'Class', names)
-#Restaurant: 'Class' weather: 'Play' Iris : 'class'
-dot.render('decision_tree', format='png', cleanup=True)
-dot.view()
