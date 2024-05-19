@@ -6,14 +6,13 @@ class DecisionTreeClassifier:
         self.root = None
         self.target = None
         self.gain = None
+        self.original_dataset = None
         
     #avalia se todos os valores do target são iguais
     def same_class(self, dataset: pd.DataFrame) -> bool:
         return dataset[self.target].value_counts().max() == dataset.shape[0]
         
     def build_tree(self, dataset: pd.DataFrame, remaining_features: list, parent_dataset: pd.DataFrame) -> Node:
-        y = dataset[self.target]
-        
         #sem samples restantes
         if dataset.shape[0] == 0:
             return Node(leaf_value= self.calculate_leaf_value( parent_dataset[ self.target ] ))
@@ -76,8 +75,7 @@ class DecisionTreeClassifier:
     
     def info_gain(self, dataset: pd.DataFrame, feature: str) -> float:
         return self.entropy_df(dataset) - self.entropy_split(dataset, feature)
-    
-    #TEMOS GANHOS >1 (?)
+
     def max_info_gain(self, dataset: pd.DataFrame, features: list) -> tuple:
         info_gains = [self.info_gain(dataset= dataset, feature= feature) for feature in features]
         max_info_gain = max(info_gains)
