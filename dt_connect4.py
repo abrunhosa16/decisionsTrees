@@ -22,7 +22,7 @@ data.columns = indice
 connect_df = data
 
 p = PreprocessData(connect_df)
-p.stratify(0.1)
+p.stratify(0.3)
 
 dt = DecisionTreeClassifier()
 dt.fit(p, dt.max_info_gain)
