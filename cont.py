@@ -43,17 +43,17 @@ def to_board(row: list):
     else: b.player = 'X'
     return b
         
-# row = connect_df.iloc[1].tolist()[:-1]
-# print(row)
+row = to_board(connect_df.iloc[1].tolist()[:-1])
+print(row)
 
 #models
 with open('variables/models.pkl', 'rb') as f:
     p, dt = pickle.load(f)
 
-dt.print_tree()
+# dt.print_tree()
 
-stats = Statistics()
-stats.evaluate_once(tree= dt, process= p)
+# stats = Statistics()
+# stats.evaluate_once(tree= dt, process= p)
 
 def dt_decision(dt: DecisionTreeClassifier, board: Board) -> Board:
     indexes = dt.original_dataset.columns[:-1]
@@ -110,12 +110,10 @@ def game(board: Board, order: list):
 def main():
     play = True
     while play:
-        order = askForFirstPlayer()
-        board = Board(order[0])
+        board = Board('O')
         board.resetBoard()
-        game(board= board, order= order)
+        game(board= board, order= ['O', 'X'])
         play = playAgain()
-
 
 if __name__ == '__main__':
     main()
