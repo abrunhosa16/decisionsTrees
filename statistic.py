@@ -73,8 +73,8 @@ class Statistics:
         y_test = test[ target ].to_list()
         y_pred = tree.predict(x_test)
         
-        print('Test values: ' + str(y_test))
-        print('Pred values: ' + str(y_pred))
+        # print('Test values: ' + str(y_test))
+        # print('Pred values: ' + str(y_pred))
         
         if len( set(process.dataset[ target ].values) ) == 2:
             precision, recall, accuracy, f1_score, confusion_matrix= self.evaluate_binary(y_test= y_test, y_pred= y_pred)
@@ -89,8 +89,13 @@ class Statistics:
             print('Precision: ' + str(precision))
             print('Recall: ' + str(recall))
             print('Accuracy: ' + str(accuracy))
-            
-    def evaluate_n_times(self, dataset: int, n: int, n_classes: int, f: int, gain: int):
+    
+    '''
+        dataset: 1- restaurant, 2- weather, 3- iris
+        f: 1- eq_frequency, 2- eq_interval_width
+        gain: 1- max_info_gain, 2- max_gini
+    '''
+    def evaluate_n_times(self, dataset: int, n: int, n_classes: int, f: int, gain: int, perc: float= 0.2):
         precisions = []
         recalls = []
         accuracies = []
@@ -100,11 +105,11 @@ class Statistics:
             process = PreprocessData(dataset= datasets[dataset - 1])
             funcs = [process.eq_frequency, process.eq_interval_width]
             process.prepare_dataset(n_classes= n_classes, func= funcs[f - 1])
-            process.stratify(0.2)
+            process.stratify(perc)
 
             dt = DecisionTreeClassifier()
             gains = [dt.max_info_gain, dt.max_gini]
-            dt.fit(dataset= process.train, option= gains[ gain - 1 ])
+            dt.fit(process= process, option= gains[ gain - 1 ])
             
             test = process.test
             target = process.target

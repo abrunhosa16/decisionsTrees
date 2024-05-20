@@ -1,5 +1,6 @@
-from node import Node
+from n0de import Node
 import pandas as pd, numpy as np
+from preProcess import PreprocessData
 
 class DecisionTreeClassifier:
     def __init__(self) -> None:
@@ -13,6 +14,8 @@ class DecisionTreeClassifier:
         return dataset[self.target].value_counts().max() == dataset.shape[0]
         
     def build_tree(self, dataset: pd.DataFrame, remaining_features: list, parent_dataset: pd.DataFrame) -> Node:
+        y = dataset[self.target]
+        
         #sem samples restantes
         if dataset.shape[0] == 0:
             return Node(leaf_value= self.calculate_leaf_value( parent_dataset[ self.target ] ))
@@ -75,7 +78,7 @@ class DecisionTreeClassifier:
     
     def info_gain(self, dataset: pd.DataFrame, feature: str) -> float:
         return self.entropy_df(dataset) - self.entropy_split(dataset, feature)
-
+    
     def max_info_gain(self, dataset: pd.DataFrame, features: list) -> tuple:
         info_gains = [self.info_gain(dataset= dataset, feature= feature) for feature in features]
         max_info_gain = max(info_gains)
@@ -134,14 +137,21 @@ class DecisionTreeClassifier:
         return max(y, key= y.count)
     
     #construçao da DT
-    def fit(self, dataset: pd.DataFrame, option) -> None: #option é self.max_info_gain ou self.max_gini
+    def fit(self, process: PreprocessData, option) -> None: #option é self.max_info_gain ou self.max_gini
         self.gain = option
-        self.original_dataset = dataset
-        features, self.target = dataset.columns.to_list()[:-1], dataset.columns[-1]
-        self.root = self.build_tree(dataset= dataset, remaining_features= features, parent_dataset= dataset)
+        self.original_dataset = process.dataset
+        features, self.target = process.train.columns.to_list()[:-1], process.train.columns[-1]
+        self.root = self.build_tree(dataset= process.train, remaining_features= features, parent_dataset= process.train)
         
     def predict(self, X: pd.DataFrame) -> list:
-        return [self.make_prediction(row, self.root) for _, row in X.iterrows()]
+        l = []
+        for _, row in X.iterrows():
+            pred = self.make_prediction(row, self.root)
+            if pred is None:
+                print(row)
+                self.print_tree()
+            l.append(pred)
+        return l
     
     def make_prediction(self, x: pd.Series, node: Node) -> int:
         if node.is_leaf(): 
@@ -166,4 +176,3 @@ class DecisionTreeClassifier:
             print(indent + "Condition: " + str(node.condition) + "|   Feature: " + node.feature)
         for child in node.children:
             self.print_tree(child, indent + "   ")
-            

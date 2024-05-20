@@ -1,4 +1,4 @@
-from node import Node
+from n0de import Node
 import graphviz
 
 def visualize_tree(tree: Node, target_name: str, label_names):

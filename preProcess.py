@@ -140,7 +140,7 @@ class PreprocessData:
                 dic = self.codification[feature]
                 new_row.append( dic.get(value) )
         return new_row
-    
+     
     # def k_means(self, K: int, feature: str) -> None: #mudar a classe target
     #     centroids = self.dataset.sample(n = K) #escolhe k pontos random do dataset
         

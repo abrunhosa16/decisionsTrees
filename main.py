@@ -64,7 +64,7 @@ if eval == 1:
 
     dt = DecisionTreeClassifier()
     gains = [dt.max_info_gain, dt.max_gini]
-    dt.fit(dataset= process.train, option= gains[ gain - 1 ])
+    dt.fit(dataset= process, option= gains[ gain - 1 ])
     dt.print_tree()
 else:
     stats = Statistics()
