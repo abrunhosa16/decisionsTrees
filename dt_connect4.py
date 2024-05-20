@@ -24,6 +24,8 @@ connect_df = data
 p = PreprocessData(connect_df)
 p.stratify(0.3)
 
+print(p.train[ p.train['Class'] == 'draw'])
+
 dt = DecisionTreeClassifier()
 dt.fit(p, dt.max_info_gain)
 dt.print_tree()
