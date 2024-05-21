@@ -43,17 +43,10 @@ def to_board(row: list):
     else: b.player = 'X'
     return b
         
-row = to_board(connect_df.iloc[1].tolist()[:-1])
-print(row)
 
 #models
 with open('variables/models.pkl', 'rb') as f:
     p, dt = pickle.load(f)
-
-# dt.print_tree()
-
-# stats = Statistics()
-# stats.evaluate_once(tree= dt, process= p)
 
 def dt_decision(dt: DecisionTreeClassifier, board: Board) -> Board:
     indexes = dt.original_dataset.columns[:-1]
@@ -77,9 +70,6 @@ def dt_decision(dt: DecisionTreeClassifier, board: Board) -> Board:
             win_indexes.append(idx)
         elif result == 'draw':
             draw_indexes.append(idx)
-    print(predicts)
-    print(win_indexes)
-    print(draw_indexes)
     
     #preferencia win > draw > loss
     if len(win_indexes) > 0:
